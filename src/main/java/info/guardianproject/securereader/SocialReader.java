@@ -68,7 +68,6 @@ import android.os.IBinder;
 import android.os.Message;
 import android.os.StatFs;
 import android.support.v4.content.LocalBroadcastManager;
-import android.text.TextUtils;
 import android.util.Log;
 
 import com.tinymission.rss.Feed;
@@ -100,7 +99,7 @@ public class SocialReader implements ICacheWordSubscriber
 	public static final boolean TESTING = false;
 	
 	public static final String LOGTAG = "SocialReader";
-	public static final boolean LOGGING = false;
+	public static final boolean LOGGING = true;
 	
 	//public static final boolean REPEATEDLY_LOAD_NETWORK_OPML = true;
 	
