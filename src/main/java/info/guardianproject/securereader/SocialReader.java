@@ -10,6 +10,7 @@
 package info.guardianproject.securereader;
 
 //import info.guardianproject.bigbuffalo.adapters.DownloadsAdapter;
+import ch.boye.httpclientandroidlib.HttpResponse;
 import info.guardianproject.cacheword.CacheWordHandler;
 import info.guardianproject.cacheword.Constants;
 import info.guardianproject.cacheword.ICacheWordSubscriber;
@@ -39,6 +40,7 @@ import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.zip.ZipEntry;
@@ -66,7 +68,6 @@ import android.os.IBinder;
 import android.os.Message;
 import android.os.StatFs;
 import android.support.v4.content.LocalBroadcastManager;
-import android.text.TextUtils;
 import android.util.Log;
 
 import com.tinymission.rss.Feed;
@@ -82,16 +83,27 @@ public class SocialReader implements ICacheWordSubscriber
 		void onLocked();
 		void onUnlocked();
 	}
-	
+
+	public interface SocialReaderFeedPreprocessor
+	{
+		/**
+		 * Return non-null to override the feed URL.
+		 * @param feed The feed to get the URL for
+		 * @return URL for feed, or null to use default URL
+		 */
+		String onGetFeedURL(Feed feed);
+		InputStream onFeedDownloaded(Feed feed, InputStream content, Map<String, String> headers);
+	}
+
 	// Change this when building for release
 	public static final boolean TESTING = false;
 	
 	public static final String LOGTAG = "SocialReader";
-	public static final boolean LOGGING = false;
+	public static final boolean LOGGING = true;
 	
 	//public static final boolean REPEATEDLY_LOAD_NETWORK_OPML = true;
 	
-	//public static final boolean REPORT_METRICS = true;
+	public static final boolean REPORT_METRICS = false;
 	
 	public static final String CONTENT_SHARING_MIME_TYPE = "application/x-bigbuffalo-bundle";
 	public static final String CONTENT_SHARING_EXTENSION = "bbb";
@@ -145,7 +157,6 @@ public class SocialReader implements ICacheWordSubscriber
 	public final int expirationCheckFrequency;
 	public final int opmlCheckFrequency;
 	public final boolean repeatedlyLoadNetworkOPML;
-	public final boolean reportMetrics;
 	public final String opmlUrl;
 	public String[] feedsWithComments;
 	
@@ -166,7 +177,8 @@ public class SocialReader implements ICacheWordSubscriber
 	Settings settings;
 	SyncServiceConnection syncServiceConnection;
 	SocialReaderLockListener lockListener;
-	
+	SocialReaderFeedPreprocessor feedPreprocessor;
+
 	public static final int ONLINE = 1;
 	public static final int NOT_ONLINE_NO_PROXY = -1;
 	public static final int NOT_ONLINE_NO_WIFI = -2;
@@ -187,7 +199,6 @@ public class SocialReader implements ICacheWordSubscriber
 		opmlCheckFrequency = applicationContext.getResources().getInteger(R.integer.opml_check_frequency);
 		opmlUrl = applicationContext.getResources().getString(R.string.opml_url);
 		repeatedlyLoadNetworkOPML = applicationContext.getResources().getBoolean(R.bool.repeatedly_load_network_opml);
-		reportMetrics = applicationContext.getResources().getBoolean(R.bool.report_metrics);
 		
 		itemLimit = applicationContext.getResources().getInteger(R.integer.item_limit);
 		mediaCacheSize = applicationContext.getResources().getInteger(R.integer.media_cache_size);
@@ -324,7 +335,17 @@ public class SocialReader implements ICacheWordSubscriber
     {
     	this.lockListener = lockListener;
     }
-    
+
+	public SocialReaderFeedPreprocessor getFeedPreprocessor()
+	{
+		return this.feedPreprocessor;
+	}
+
+	public void setFeedPreprocessor(SocialReaderFeedPreprocessor feedPreprocessor)
+	{
+		this.feedPreprocessor = feedPreprocessor;
+	}
+
 	class SyncServiceConnection implements ServiceConnection {
 
 		public boolean isConnected = false;
@@ -604,16 +625,16 @@ public class SocialReader implements ICacheWordSubscriber
 			} else if (lang == UiLanguage.Turkish) {
 				finalOpmlUrl = finalOpmlUrl + "tr";
 			}
-					
+			
+			if (!settings.networkOpmlLoaded()) {
+				finalOpmlUrl += "&first=true";
+			}
+			
 			if (applicationContext.getResources().getBoolean(R.bool.fulltextfeeds)) {
 				finalOpmlUrl += "&fulltext=true";
 			}
 			
-			if (reportMetrics) {
-				if (!settings.networkOpmlLoaded()) {
-					finalOpmlUrl += "&first=true";
-				}
-				
+			if (REPORT_METRICS) {
 				ConnectivityManager connectivityManager = (ConnectivityManager) applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE);
 				NetworkInfo networkInfo;
 
@@ -1473,22 +1494,18 @@ public class SocialReader implements ICacheWordSubscriber
 		}
 		
 		// Create talk item
-		String talkItemUrl = applicationContext.getResources().getString(R.string.talk_item_feed_url);
-		if (!TextUtils.isEmpty(talkItemUrl))
-		{
-			talkItem = new Item();
-			talkItem.setFavorite(true); // So it doesn't delete
-			talkItem.setGuid(talkItemUrl);
-			talkItem.setTitle("Example Favorite");
-			talkItem.setFeedId(-1);
-			talkItem.setDescription("This is an examople favorite.  Anything you mark as a favorite will show up in this section and won't be automatically deleted");
-			talkItem.dbsetRemotePostId(applicationContext.getResources().getInteger(R.integer.talk_item_remote_id));			
-			talkItem.setCommentsUrl(talkItemUrl);
-			this.databaseAdapter.addOrUpdateItem(talkItem,itemLimit);
-			if (LOGGING)
-				Log.v(LOGTAG,"talkItem has database ID " + talkItem.getDatabaseId());		
-		}
-		
+		talkItem = new Item();
+		talkItem.setFavorite(true); // So it doesn't delete
+		talkItem.setGuid(applicationContext.getResources().getString(R.string.talk_item_feed_url));
+		talkItem.setTitle("Example Favorite");
+		talkItem.setFeedId(-1);
+		talkItem.setDescription("This is an examople favorite.  Anything you mark as a favorite will show up in this section and won't be automatically deleted");
+		talkItem.dbsetRemotePostId(applicationContext.getResources().getInteger(R.integer.talk_item_remote_id));			
+		talkItem.setCommentsUrl(applicationContext.getResources().getString(R.string.talk_item_feed_url));
+		this.databaseAdapter.addOrUpdateItem(talkItem,itemLimit);
+		if (LOGGING)
+			Log.v(LOGTAG,"talkItem has database ID " + talkItem.getDatabaseId());		
+
 		if (LOGGING)
 			Log.v(LOGTAG,"databaseAdapter initialized");
 	}
@@ -1576,45 +1593,38 @@ public class SocialReader implements ICacheWordSubscriber
 					Log.v(LOGTAG,"sdcard mounted");
 				
 				filesDir = applicationContext.getExternalFilesDir(null);
-				if (filesDir != null) {
-					done = true;
-					if (!filesDir.exists())
-					{
-						if (LOGGING) 
-							Log.v(LOGTAG, "filesDir doesn't exist, making it");
-						
-						filesDir.mkdirs();
-						
-						if (LOGGING && !filesDir.exists())
-							Log.v(LOGTAG, "still doesn't exist, error!");		
-						
-						testExternalStorage(filesDir);
-					}
-					else 
-					{
-						if (LOGGING) 
-							Log.v(LOGTAG, "filesDir exists");
-	
-					}
-					
+				if (!filesDir.exists())
+				{
 					if (LOGGING) 
-						Log.v(LOGTAG,"filesDir:" + filesDir.getAbsolutePath());
-				} else {
-					if (LOGGING)
-						Log.v(LOGTAG,"filesDir is still null");
+						Log.v(LOGTAG, "filesDir doesn't exist, making it");
+					
+					filesDir.mkdirs();
+					
+					if (LOGGING && !filesDir.exists())
+						Log.v(LOGTAG, "still doesn't exist, error!");		
+					
+					testExternalStorage(filesDir);
 				}
+				else 
+				{
+					if (LOGGING) 
+						Log.v(LOGTAG, "filesDir exists");
+
+				}
+				
+				if (LOGGING) 
+					Log.v(LOGTAG,"filesDir:" + filesDir.getAbsolutePath());
+
+			}
+			else
+			{
+				if (LOGGING) 
+					Log.v(LOGTAG,"on internal storage");
+				
+				filesDir = applicationContext.getDir(FILES_DIR_NAME, Context.MODE_PRIVATE);
 			}
 		}
-		
-		// If we still aren't done
-		if (!done)
-		{
-			if (LOGGING) 
-				Log.v(LOGTAG,"on internal storage");
-			
-			filesDir = applicationContext.getDir(FILES_DIR_NAME, Context.MODE_PRIVATE);
-		}
-		
+	
 		return filesDir;
 	}
 	
