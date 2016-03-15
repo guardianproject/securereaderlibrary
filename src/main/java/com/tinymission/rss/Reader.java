@@ -1,11 +1,13 @@
 package com.tinymission.rss;
 
+import ch.boye.httpclientandroidlib.Header;
 import info.guardianproject.netcipher.client.StrongHttpsClient;
 import info.guardianproject.securereader.SocialReader;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Stack;
 
 import javax.xml.parsers.ParserConfigurationException;
@@ -107,43 +109,61 @@ public class Reader
 
 			XMLReader xr = sp.getXMLReader();
 			
-			xr.setErrorHandler(new ErrorHandler() { 
+			xr.setErrorHandler(new ErrorHandler() {
 				public void error(SAXParseException exception) throws SAXException {
-					if (LOGGING) { 
-						Log.v(LOGTAG, "ErrorHandler: SAXParseException error: " + exception.getMessage()); 
-						exception.printStackTrace();
-					}
-				}
-			  
-				public void fatalError(SAXParseException exception) throws SAXException { 
 					if (LOGGING) {
-						Log.v(LOGTAG, "ErrorHandler: SAXParseException fatalError: " + exception.getMessage()); 
+						Log.v(LOGTAG, "ErrorHandler: SAXParseException error: " + exception.getMessage());
 						exception.printStackTrace();
 					}
 				}
-			  
+
+				public void fatalError(SAXParseException exception) throws SAXException {
+					if (LOGGING) {
+						Log.v(LOGTAG, "ErrorHandler: SAXParseException fatalError: " + exception.getMessage());
+						exception.printStackTrace();
+					}
+				}
+
 				public void warning(SAXParseException exception) throws SAXException {
 					if (LOGGING) {
 						Log.v(LOGTAG, "ErrorHandler: SAXParseException warning: " + exception.getMessage());
-						exception.printStackTrace(); 
+						exception.printStackTrace();
 					}
-				} 
+				}
 			});
-			
+
 
 			Handler handler = new Handler();
 			xr.setContentHandler(handler);
 
+			String feedUrl = feed.getFeedURL();
+			if (socialReader.getFeedPreprocessor() != null) {
+				String newFeedUrl = socialReader.getFeedPreprocessor().onGetFeedURL(feed);
+				if (newFeedUrl != null) {
+					if (LOGGING)
+						Log.v(LOGTAG, "Feed URL changed by callback: " + feedUrl + " -> " + newFeedUrl);
+					feedUrl = newFeedUrl;
+				}
+			}
+
 			final String PREFIX = "file:///android_asset/";
-			if (feed.getFeedURL().startsWith("file:///")) {
+			if (feedUrl.startsWith("file:///")) {
 				
 				if (LOGGING)
-					Log.v(LOGTAG,"Opening: " + feed.getFeedURL().substring(PREFIX.length()));
+					Log.v(LOGTAG,"Opening: " + feedUrl.substring(PREFIX.length()));
 				
 				AssetManager assetManager = socialReader.applicationContext.getAssets();
 				
-				InputStream is = assetManager.open(feed.getFeedURL().substring(PREFIX.length()));
-				
+				InputStream is = assetManager.open(feedUrl.substring(PREFIX.length()));
+				if (socialReader.getFeedPreprocessor() != null) {
+					InputStream newIs = socialReader.getFeedPreprocessor().onFeedDownloaded(feed, is, null);
+					if (newIs != null) {
+						if (LOGGING)
+							Log.v(LOGTAG, "Feed content was changed by callback");
+						is = newIs;
+					}
+				}
+
 				xr.parse(new InputSource(is));
 				
 				is.close();
@@ -164,13 +184,13 @@ public class Reader
 				    	Log.v(LOGTAG,"Using Proxy: " + socialReader.getProxyType() + socialReader.getProxyHost() + socialReader.getProxyPort());
 				}
 	
-				if (feed.getFeedURL() != null && !(feed.getFeedURL().isEmpty()))
+				if (feedUrl != null && !(feedUrl.isEmpty()))
 				{
-					HttpGet httpGet = new HttpGet(feed.getFeedURL());
+					HttpGet httpGet = new HttpGet(feedUrl);
 					httpGet.setHeader("User-Agent", SocialReader.USERAGENT);
 
 					if (LOGGING)
-						Log.v(LOGTAG,"Hitting: " + feed.getFeedURL());
+						Log.v(LOGTAG,"Hitting: " + feedUrl);
 					
 					HttpResponse response = httpClient.execute(httpGet);
 					
@@ -180,11 +200,23 @@ public class Reader
 					if (response.getStatusLine().getStatusCode() == 200) {
 						if (LOGGING)
 							Log.v(LOGTAG,"Response Code is good");
-						
+
 						InputStream is = response.getEntity().getContent();
-						
+						if (socialReader.getFeedPreprocessor() != null) {
+							HashMap<String, String> headers = new HashMap<String, String>();
+							for (Header h : response.getAllHeaders()) {
+								headers.put(h.getName(), h.getValue());
+							}
+							InputStream newIs = socialReader.getFeedPreprocessor().onFeedDownloaded(feed, response.getEntity().getContent(), headers);
+							if (newIs != null) {
+								if (LOGGING)
+									Log.v(LOGTAG, "Feed content was changed by callback");
+								is = newIs;
+							}
+						}
+
 						xr.parse(new InputSource(is));
-						
+
 						is.close();
 	
 						Date currentDate = new Date();
