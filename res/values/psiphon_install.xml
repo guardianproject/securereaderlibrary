@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="psiphon_install_title">Install Psiphon?</string>
+    <string name="psiphon_install_prompt">You must have Psiphon installed and activated to proxy traffic through it. Would you like to install it from Google Play?</string>
+    <string name="psiphon_install_ok">@android:string/ok</string>
+    <string name="psiphon_install_cancel">@android:string/cancel</string> 
+    <string name="psiphon_install_uri">https://play.google.com/store/apps/details?id=com.psiphon3</string> 
+</resources>
