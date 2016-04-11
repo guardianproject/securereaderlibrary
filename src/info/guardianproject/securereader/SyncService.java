@@ -18,10 +18,14 @@ public class SyncService extends Service {
 	public static final boolean LOGGING = false;
 	
 	// ArrayList of SyncTask objects, basically a queue of work to be done
-	ArrayList<SyncTask> syncList = new ArrayList<SyncTask>();
+	public ArrayList<SyncTask> syncList = new ArrayList<SyncTask>();
 
 	// Single thread for background syncing
 	Thread syncThread;
+
+	public ArrayList<SyncTask> getSyncList() {
+		return syncList;
+	}
 	
 	// Service starting..
     @Override

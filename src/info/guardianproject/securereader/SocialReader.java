@@ -172,6 +172,13 @@ public class SocialReader implements ICacheWordSubscriber
 	public static final int NOT_ONLINE_NO_WIFI = -2;
 	public static final int NOT_ONLINE_NO_WIFI_OR_NETWORK = -3;
 	
+//	// WORK ON THIS
+//	public int syncStatus = 0;
+//	// Status indication
+//	public static final int NO_SYNC_IN_PROGRESS = 0;
+//	public static final int MANUAL_SYNC_IN_PROGRESS = 2; 
+//	public static final int BACKGROUND_SYNC_IN_PROGRESS = 1;
+	
 	//OrbotHelper orbotHelper;
 	PsiphonHelper psiphonHelper;
 	
