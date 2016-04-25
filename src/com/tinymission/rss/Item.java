@@ -1,5 +1,7 @@
 package com.tinymission.rss;
 
+import info.guardianproject.securereader.HTMLToPlainTextFormatter;
+
 import java.io.Serializable;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -185,7 +187,13 @@ public class Item extends FeedEntity implements Serializable
 
 	private String getCleanContentEncoded()
 	{
-		HtmlToPlainText formatter = new HtmlToPlainText();
+		HTMLToPlainTextFormatter formatter = new HTMLToPlainTextFormatter();
+        return formatter.getPlainText(Jsoup.parse(getContentEncoded()));
+	}
+	
+	private String getFormattedContentEncoded(HTMLToPlainTextFormatter formatter)
+	{
+		//HtmlToPlainText formatter = new HtmlToPlainText();
         return formatter.getPlainText(Jsoup.parse(getContentEncoded()));
 	}
 
@@ -209,7 +217,23 @@ public class Item extends FeedEntity implements Serializable
 			return null;
 		}
 	}
-
+	
+	public String getFormattedMainContent(HTMLToPlainTextFormatter formatter)
+	{
+		if (_contentEncoded != null && !_contentEncoded.isEmpty())
+		{
+			return getFormattedContentEncoded(formatter);
+		}
+		else if (_description != null)
+		{
+			return getCleanDescription();
+		}
+		else
+		{
+			return null;
+		}		
+	}
+	
 	public String getCleanMainContent()
 	{
 		if (_contentEncoded != null && !_contentEncoded.isEmpty())
