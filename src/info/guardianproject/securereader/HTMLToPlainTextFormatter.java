@@ -20,11 +20,10 @@ public class HTMLToPlainTextFormatter {
      * @param element the root element to format
      * @return formatted text
      */
-    public String getPlainText(Element element) {
+    public CharSequence getPlainText(Element element) {
         FormattingVisitor formatter = new FormattingVisitor();
         NodeTraversor traversor = new NodeTraversor(formatter);
         traversor.traverse(element); // walk the DOM, and call .head() and .tail() for each node
-
         return formatter.toString();
     }
 
