@@ -185,13 +185,13 @@ public class Item extends FeedEntity implements Serializable
 		return _contentEncoded;
 	}
 
-	private String getCleanContentEncoded()
+	private CharSequence getCleanContentEncoded()
 	{
 		HTMLToPlainTextFormatter formatter = new HTMLToPlainTextFormatter();
         return formatter.getPlainText(Jsoup.parse(getContentEncoded()));
 	}
 	
-	private String getFormattedContentEncoded(HTMLToPlainTextFormatter formatter)
+	private CharSequence getFormattedContentEncoded(HTMLToPlainTextFormatter formatter)
 	{
 		//HtmlToPlainText formatter = new HtmlToPlainText();
         return formatter.getPlainText(Jsoup.parse(getContentEncoded()));
@@ -218,7 +218,7 @@ public class Item extends FeedEntity implements Serializable
 		}
 	}
 	
-	public String getFormattedMainContent(HTMLToPlainTextFormatter formatter)
+	public CharSequence getFormattedMainContent(HTMLToPlainTextFormatter formatter)
 	{
 		if (_contentEncoded != null && !_contentEncoded.isEmpty())
 		{
@@ -234,7 +234,7 @@ public class Item extends FeedEntity implements Serializable
 		}		
 	}
 	
-	public String getCleanMainContent()
+	public CharSequence getCleanMainContent()
 	{
 		if (_contentEncoded != null && !_contentEncoded.isEmpty())
 		{
