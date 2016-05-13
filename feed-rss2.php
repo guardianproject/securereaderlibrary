@@ -59,7 +59,7 @@ do_action( 'rss_tag_pre', 'rss2' );
 		echo apply_filters( 'rss_update_period', $duration );
 	?></sy:updatePeriod>
 	<sy:updateFrequency><?php
-		$frequency = '1';
+		$frequency = '0';
 
 		/**
 		 * Filter the RSS update frequency.
@@ -86,7 +86,7 @@ do_action( 'rss_tag_pre', 'rss2' );
 		<link><?php the_permalink_rss() ?></link>
 		<comments><?php comments_link_feed(); ?></comments>
 		<pubDate><?php echo mysql2date('D, d M Y H:i:s +0000', get_post_time('Y-m-d H:i:s', true), false); ?></pubDate>
-		<dc:creator><?php echo ent2ncr(get_user_meta( $comment->user_id, 'nickname', true )) ?></dc:creator>
+		<dc:creator><?php the_author_meta('nickname') ?></dc:creator>
 		<?php the_category_rss('rss2') ?>
 
 		<guid isPermaLink="false"><?php the_guid(); ?></guid>
