@@ -175,6 +175,11 @@ public class SyncServiceMediaDownloader implements Runnable
 					StrongHttpsClient httpClient = new StrongHttpsClient(syncService.getApplicationContext());
 
 					SocialReader socialReader = SocialReader.getInstance(syncService.getApplicationContext());
+
+					if (socialReader.relaxedHTTPS) {
+						httpClient.enableSSLCompatibilityMode();
+					}
+
 					if (socialReader.useProxy())
 					{
 						httpClient.useProxy(true, socialReader.getProxyType(), socialReader.getProxyHost(), socialReader.getProxyPort());

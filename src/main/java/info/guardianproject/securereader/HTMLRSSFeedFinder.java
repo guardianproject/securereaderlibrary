@@ -85,7 +85,11 @@ public class HTMLRSSFeedFinder {
 			protected Void doInBackground(Void... params)
 			{
 				StrongHttpsClient httpClient = new StrongHttpsClient(socialReader.applicationContext);
-				
+
+				if (socialReader.relaxedHTTPS) {
+					httpClient.enableSSLCompatibilityMode();
+				}
+
 				if (socialReader.useProxy())
 				{
 					if (LOGGING)

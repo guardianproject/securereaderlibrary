@@ -484,6 +484,10 @@ public class XmlRpcClient extends XmlRpcParser implements XmlRpcInvocationHandle
 	{
 		StrongHttpsClient httpClient = new StrongHttpsClient(mContext);
 
+//		if (socialReader.relaxedHTTPS) {
+//			httpClient.enableSSLCompatibilityMode();
+//		}
+
 		if (mUseProxy)
 		{
 			httpClient.useProxy(true, mProxyType, mProxyHost, mProxyPort);

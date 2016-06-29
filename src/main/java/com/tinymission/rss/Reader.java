@@ -175,6 +175,11 @@ public class Reader
 			} else {
 			
 				StrongHttpsClient httpClient = new StrongHttpsClient(socialReader.applicationContext);
+
+				if (socialReader.relaxedHTTPS) {
+					httpClient.enableSSLCompatibilityMode();
+				}
+
 				if (socialReader.useProxy())
 				{
 				    httpClient.useProxy(true, socialReader.getProxyType(), socialReader.getProxyHost(), socialReader.getProxyPort());
