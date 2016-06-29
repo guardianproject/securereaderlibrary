@@ -27,7 +27,9 @@ public class SyncServiceCommentsFeedFetcher implements Runnable
 	
 	Messenger messenger;
 	Handler runHandler;
-	
+
+	CommentReader reader;
+
 	public interface SyncServiceCommentsFeedFetchedCallback
 	{
 		public void commentsFeedFetched(Item _item);
@@ -48,11 +50,14 @@ public class SyncServiceCommentsFeedFetcher implements Runnable
 		
 		messenger = new Messenger(runHandler);
 	}
-	
+
+	public void stop() {
+		reader.stop();
+	}
 	
 	@Override
 	public void run() {		
-		CommentReader reader = new CommentReader(SocialReader.getInstance(syncService.getApplicationContext()), syncTask.item);
+		reader = new CommentReader(SocialReader.getInstance(syncService.getApplicationContext()), syncTask.item);
 		Feed tempFeed = reader.fetchCommentFeed();
 
 		SocialReader.getInstance(syncService.getApplicationContext()).setItemComments(syncTask.item, tempFeed.getComments());			

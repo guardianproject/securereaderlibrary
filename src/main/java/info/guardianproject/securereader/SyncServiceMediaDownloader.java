@@ -29,13 +29,15 @@ import com.tinymission.rss.MediaContent;
 public class SyncServiceMediaDownloader implements Runnable
 {
 	public final static boolean LOGGING = false;
-	public final static String LOGTAG = "SyncServiceMediaDownloader";
+	public final static String LOGTAG = "SyncServiceMdDwnlder";
 
 	SyncService syncService;
 	SyncService.SyncTask syncTask;
 	
 	Messenger messenger;
 	Handler runHandler;
+
+	InputStream inputStream;
 		
 	public SyncServiceMediaDownloader(SyncService _syncService, SyncService.SyncTask _syncTask)
 	{
@@ -69,6 +71,13 @@ public class SyncServiceMediaDownloader implements Runnable
 		out.close();
 	}
 
+	public void stop() {
+		try {
+			inputStream.close();
+		} catch (IOException ioe) {
+			if (LOGGING) ioe.printStackTrace();
+		}
+	}
 
 	@Override
 	public void run() 
@@ -77,7 +86,7 @@ public class SyncServiceMediaDownloader implements Runnable
 			Log.v(LOGTAG, "SyncServiceMediaDownloader: run");
 
 		File savedFile = null;
-		InputStream inputStream = null;
+		inputStream = null;
 
 		MediaContent mediaContent = syncTask.mediaContent;
 		

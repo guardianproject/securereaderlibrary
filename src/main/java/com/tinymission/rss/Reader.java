@@ -41,6 +41,8 @@ public class Reader
 
 	private SocialReader socialReader;
 
+	InputStream is;
+
 	/**
 	 * The allowed tags to parse content from (everything else gets lumped into
 	 * its parent content, which allows for embedding html content.
@@ -92,6 +94,16 @@ public class Reader
 		socialReader = _socialReader;
 		_feed.setStatus(Feed.STATUS_SYNC_IN_PROGRESS);
 		feed = _feed;
+	}
+
+	public void stop() {
+		if (is != null) {
+			try {
+				is.close();
+			} catch (IOException ioe) {
+				if (LOGGING) ioe.printStackTrace();
+			}
+		}
 	}
 
 	/**
@@ -154,7 +166,7 @@ public class Reader
 				
 				AssetManager assetManager = socialReader.applicationContext.getAssets();
 				
-				InputStream is = assetManager.open(feedUrl.substring(PREFIX.length()));
+				is = assetManager.open(feedUrl.substring(PREFIX.length()));
 				if (socialReader.getFeedPreprocessor() != null) {
 					InputStream newIs = socialReader.getFeedPreprocessor().onFeedDownloaded(feed, is, null);
 					if (newIs != null) {

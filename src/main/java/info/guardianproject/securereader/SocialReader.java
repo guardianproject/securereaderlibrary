@@ -100,7 +100,7 @@ public class SocialReader implements ICacheWordSubscriber
 	public static final boolean TESTING = false;
 	
 	public static final String LOGTAG = "SocialReader";
-	public static final boolean LOGGING = false;
+	public static final boolean LOGGING = true;
 	
 	//public static final boolean REPEATEDLY_LOAD_NETWORK_OPML = true;
 	
@@ -1556,6 +1556,10 @@ public class SocialReader implements ICacheWordSubscriber
 				Log.v(LOGTAG, "Running on KITKAT or greater");
 			}
 			java.io.File[] possibleLocations = applicationContext.getExternalFilesDirs(null);
+			if (LOGGING) {
+
+				Log.v(LOGTAG, "Got " + possibleLocations.length + " locations");
+			}
 			long largestSize = 0;
 			for (int l = 0; l < possibleLocations.length; l++) {
 				if (possibleLocations[l] != null && possibleLocations[l].getAbsolutePath() != null) {	
@@ -1708,10 +1712,18 @@ public class SocialReader implements ICacheWordSubscriber
 
 	private void deleteFileSystem()
 	{
+		/*  Trying this - without unmount
 		if (vfs != null && vfs.isMounted()) {
-			vfs.unmount();
+			try {
+				vfs.unmount();
+			} catch (IllegalStateException ise) {
+				if (LOGGING) ise.printStackTrace();
+				ise.printStackTrace();
+			}
+			vfs.deleteContainer();
 			vfs = null;
 		}
+		*/
 
 		// Delete all possible locations
 		
@@ -1725,7 +1737,7 @@ public class SocialReader implements ICacheWordSubscriber
 			{
 				possibleDirFiles[i].delete();
 			}
-			possibleDir.delete();	
+			//possibleDir.delete();
 		}
 		
 		// This is a backup, just in case they have a removable sd card inserted but also have
@@ -1741,7 +1753,7 @@ public class SocialReader implements ICacheWordSubscriber
 				{
 					externalFiles[i].delete();
 				}
-				externalFilesDir.delete();
+				//externalFilesDir.delete();
 			}
 		}
 
@@ -2310,13 +2322,23 @@ public class SocialReader implements ICacheWordSubscriber
 			databaseAdapter = null;
 		}
 
+		/* Trying this
 		if (vfs != null && vfs.isMounted()) {
 			if (LOGGING)
 				Log.v(LOGTAG, "vfs.unmount(); vfs = null;");
-			
-			vfs.unmount();
+
+
+
+			try {
+				vfs.unmount();
+			} catch (IllegalStateException ise) {
+				if (LOGGING) ise.printStackTrace();
+				ise.printStackTrace();
+			}
+			vfs.deleteContainer();
 			vfs = null;
 		}
+		*/
 		
 		if (LOGGING)
 			Log.v(LOGTAG, "applicationContext.deleteDatabase(DatabaseHelper.DATABASE_NAME);");
@@ -2324,7 +2346,7 @@ public class SocialReader implements ICacheWordSubscriber
 		applicationContext.deleteDatabase(DatabaseHelper.DATABASE_NAME);
 
 		if (LOGGING)
-			Log.v(LOGTAG, "deleteFileSystem()");
+			Log.v(LOGTAG, "NOT deleteFileSystem()");
 		deleteFileSystem();
 		
 		// Reset Prefs to initial state

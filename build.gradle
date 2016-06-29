@@ -21,7 +21,8 @@ dependencies {
     //compile project(':libnetcipher')
     compile 'com.android.support:support-v4:23.2.0'
     compile 'com.google.guava:guava:18.0'
-    compile 'info.guardianproject.iocipher:IOCipher:0.3'
+    //compile 'info.guardianproject.iocipher:IOCipher:0.3'
+    compile files('libs/IOCipher-v0.3-debug.jar')
     compile 'info.guardianproject.cacheword:cachewordlib:0.1'
     compile files('libs/commons-codec.jar')
     compile files('libs/gp-bcc-lib.jar')
