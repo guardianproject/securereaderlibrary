@@ -11,7 +11,7 @@ import android.util.Log;
 public class Settings
 {
 	public static final String LOGTAG = "Settings";
-	public static final boolean LOGGING = true;
+	public static final boolean LOGGING = false;
 	
 	protected final SharedPreferences mPrefs;
 	private final boolean mIsFirstRun;
