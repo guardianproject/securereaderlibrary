@@ -560,7 +560,8 @@ public class SocialReader implements ICacheWordSubscriber
 					Log.v(LOGTAG,"Checking Article Expirations");
 				settings.setLastItemExpirationCheckTime(System.currentTimeMillis());
 				Date expirationDate = new Date(System.currentTimeMillis() - settings.articleExpirationMillis());
-				databaseAdapter.deleteExpiredItems(expirationDate);
+				if (databaseAdapter != null && databaseAdapter.databaseReady())
+					databaseAdapter.deleteExpiredItems(expirationDate);
 			}
 		} else {
 			if (LOGGING)
@@ -2878,7 +2879,8 @@ public class SocialReader implements ICacheWordSubscriber
 			{
 				mediaContent.setWidth(o.outWidth);
 				mediaContent.setHeight(o.outHeight);
-				databaseAdapter.updateItemMedia(mediaContent);
+				if (databaseAdapter != null && databaseAdapter.databaseReady())
+					databaseAdapter.updateItemMedia(mediaContent);
 			}
 		}
 		catch (FileNotFoundException e)
