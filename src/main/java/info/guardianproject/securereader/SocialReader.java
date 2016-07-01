@@ -100,7 +100,7 @@ public class SocialReader implements ICacheWordSubscriber
 	public static final boolean TESTING = false;
 	
 	public static final String LOGTAG = "SocialReader";
-	public static final boolean LOGGING = true;
+	public static final boolean LOGGING = false;
 	
 	//public static final boolean REPEATEDLY_LOAD_NETWORK_OPML = true;
 	
@@ -1720,7 +1720,7 @@ public class SocialReader implements ICacheWordSubscriber
 				if (LOGGING) ise.printStackTrace();
 				ise.printStackTrace();
 			}
-			//vfs.deleteContainer();
+			vfs.deleteContainer();
 			vfs = null;
 		}
 
@@ -1736,7 +1736,7 @@ public class SocialReader implements ICacheWordSubscriber
 			{
 				possibleDirFiles[i].delete();
 			}
-			//possibleDir.delete();
+			possibleDir.delete();
 		}
 		
 		// This is a backup, just in case they have a removable sd card inserted but also have
@@ -1752,7 +1752,7 @@ public class SocialReader implements ICacheWordSubscriber
 				{
 					externalFiles[i].delete();
 				}
-				//externalFilesDir.delete();
+				externalFilesDir.delete();
 			}
 		}
 
