@@ -1712,7 +1712,6 @@ public class SocialReader implements ICacheWordSubscriber
 
 	private void deleteFileSystem()
 	{
-		/*  Trying this - without unmount
 		if (vfs != null && vfs.isMounted()) {
 			try {
 				vfs.unmount();
@@ -1720,10 +1719,9 @@ public class SocialReader implements ICacheWordSubscriber
 				if (LOGGING) ise.printStackTrace();
 				ise.printStackTrace();
 			}
-			vfs.deleteContainer();
+			//vfs.deleteContainer();
 			vfs = null;
 		}
-		*/
 
 		// Delete all possible locations
 		
@@ -2335,7 +2333,7 @@ public class SocialReader implements ICacheWordSubscriber
 				if (LOGGING) ise.printStackTrace();
 				ise.printStackTrace();
 			}
-			vfs.deleteContainer();
+			//vfs.deleteContainer();
 			vfs = null;
 		}
 		*/
