@@ -277,7 +277,8 @@ public class Settings
 	 */
 	public boolean wipeApp()
 	{
-		return mPrefs.getBoolean(KEY_WIPE_APP, false);
+		boolean wipeAppDefault = context.getResources().getBoolean(R.bool.wipe_app_default);
+		return mPrefs.getBoolean(KEY_WIPE_APP, wipeAppDefault);
 	}
 
 	/**
