@@ -59,6 +59,10 @@ public class NonVFSMediaDownloader extends AsyncTask<MediaContent, Integer, File
 		MediaContent mediaContent = params[0];
 		StrongHttpsClient httpClient = new StrongHttpsClient(socialReader.applicationContext);
 
+		if (socialReader.relaxedHTTPS) {
+			httpClient.enableSSLCompatibilityMode();
+		}
+
 		if (socialReader.useProxy())
 		{
 			if (LOGGING) 

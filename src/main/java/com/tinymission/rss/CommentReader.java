@@ -151,7 +151,13 @@ public class CommentReader
 			xr.setContentHandler(handler);
 
 				StrongHttpsClient httpClient = new StrongHttpsClient(socialReader.applicationContext);
-				if (socialReader.useProxy())
+
+			if (socialReader.relaxedHTTPS) {
+				httpClient.enableSSLCompatibilityMode();
+			}
+
+
+			if (socialReader.useProxy())
 				{
 				    httpClient.useProxy(true, socialReader.getProxyType(), socialReader.getProxyHost(), socialReader.getProxyPort());
 				}

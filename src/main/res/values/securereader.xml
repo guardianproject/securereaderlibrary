@@ -58,4 +58,7 @@
 	
 	<!-- Limit amount of media items to keep on disk in megabytes -1 for no limit -->
 	<integer name="media_cache_size">-1</integer>
+
+	<!-- Relaxed HTTPS checking -->
+	<bool name="relaxed_https">false</bool>
 </resources>

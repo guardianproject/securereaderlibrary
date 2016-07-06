@@ -166,6 +166,8 @@ public class SocialReader implements ICacheWordSubscriber
 	public final int itemLimit;
 	public final int mediaCacheSize;
 	public final long mediaCacheSizeLimitInBytes;
+
+	public final boolean relaxedHTTPS;
 	
 	// Constant to use when passing an item to be shared to the
 	// securebluetoothsender as an extra in the intent
@@ -201,7 +203,9 @@ public class SocialReader implements ICacheWordSubscriber
 		
 		this.applicationContext = _context;
 		psiphonHelper = new PsiphonHelper();
-		
+
+		relaxedHTTPS = applicationContext.getResources().getBoolean(R.bool.relaxed_https);
+
 		feedRefreshAge = applicationContext.getResources().getInteger(R.integer.feed_refresh_age);
 		expirationCheckFrequency = applicationContext.getResources().getInteger(R.integer.expiration_check_frequency);
 		opmlCheckFrequency = applicationContext.getResources().getInteger(R.integer.opml_check_frequency);
