@@ -136,44 +136,58 @@ public class Reader
 			Handler handler = new Handler();
 			xr.setContentHandler(handler);
 
-			String feedUrl = feed.getFeedURL();
-			if (socialReader.getFeedPreprocessor() != null) {
-				String newFeedUrl = socialReader.getFeedPreprocessor().onGetFeedURL(feed);
-				if (newFeedUrl != null) {
-					if (LOGGING)
-						Log.v(LOGTAG, "Feed URL changed by callback: " + feedUrl + " -> " + newFeedUrl);
-					feedUrl = newFeedUrl;
+			String feedUrl = "";
+			// If it's not an input stream, check the preprocessor
+			if (feed.getInputStream() == null) {
+
+				feedUrl = feed.getFeedURL();
+				if (socialReader.getFeedPreprocessor() != null) {
+					String newFeedUrl = socialReader.getFeedPreprocessor().onGetFeedURL(feed);
+					if (newFeedUrl != null) {
+						if (LOGGING)
+							Log.v(LOGTAG, "Feed URL changed by callback: " + feedUrl + " -> " + newFeedUrl);
+						feedUrl = newFeedUrl;
+					}
 				}
 			}
 
 			final String PREFIX = "file:///android_asset/";
-			if (feedUrl.startsWith("file:///")) {
-				
-				if (LOGGING)
-					Log.v(LOGTAG,"Opening: " + feedUrl.substring(PREFIX.length()));
-				
-				AssetManager assetManager = socialReader.applicationContext.getAssets();
-				
-				InputStream is = assetManager.open(feedUrl.substring(PREFIX.length()));
-				if (socialReader.getFeedPreprocessor() != null) {
-					InputStream newIs = socialReader.getFeedPreprocessor().onFeedDownloaded(feed, is, null);
-					if (newIs != null) {
-						if (LOGGING)
-							Log.v(LOGTAG, "Feed content was changed by callback");
-						is = newIs;
+			// If it's an input stream or a file url then we are dealing with an input stream
+			if (feed.getInputStream() != null || feedUrl.startsWith("file:///")) {
+				InputStream is = null;
+
+				// If it's not an input stream, get the inputstream
+				if (feed.getInputStream() == null) {
+					if (LOGGING)
+						Log.v(LOGTAG, "Opening: " + feedUrl.substring(PREFIX.length()));
+
+					AssetManager assetManager = socialReader.applicationContext.getAssets();
+
+					is = assetManager.open(feedUrl.substring(PREFIX.length()));
+					if (socialReader.getFeedPreprocessor() != null) {
+						InputStream newIs = socialReader.getFeedPreprocessor().onFeedDownloaded(feed, is, null);
+						if (newIs != null) {
+							if (LOGGING)
+								Log.v(LOGTAG, "Feed content was changed by callback");
+							is = newIs;
+						}
 					}
+				} else {
+					// Otherwise get the input stream directly
+					is = feed.getInputStream();
 				}
 
+				// Parse it
 				xr.parse(new InputSource(is));
-				
+
 				is.close();
 
 				Date currentDate = new Date();
 				feed.setNetworkPullDate(currentDate);
-				feed.setStatus(Feed.STATUS_LAST_SYNC_GOOD);				
-				
+				feed.setStatus(Feed.STATUS_LAST_SYNC_GOOD);
+
 			} else {
-			
+
 				StrongHttpsClient httpClient = new StrongHttpsClient(socialReader.applicationContext);
 
 				if (socialReader.relaxedHTTPS) {
@@ -188,7 +202,7 @@ public class Reader
 				    if (LOGGING)
 				    	Log.v(LOGTAG,"Using Proxy: " + socialReader.getProxyType() + socialReader.getProxyHost() + socialReader.getProxyPort());
 				}
-	
+
 				if (feedUrl != null && !(feedUrl.isEmpty()))
 				{
 					HttpGet httpGet = new HttpGet(feedUrl);
@@ -196,12 +210,12 @@ public class Reader
 
 					if (LOGGING)
 						Log.v(LOGTAG,"Hitting: " + feedUrl);
-					
+
 					HttpResponse response = httpClient.execute(httpGet);
-					
+
 					if (LOGGING)
 						Log.v(LOGTAG,"Response: " + response.toString());
-	
+
 					if (response.getStatusLine().getStatusCode() == 200) {
 						if (LOGGING)
 							Log.v(LOGTAG,"Response Code is good");
@@ -223,11 +237,11 @@ public class Reader
 						xr.parse(new InputSource(is));
 
 						is.close();
-	
+
 						Date currentDate = new Date();
 						feed.setNetworkPullDate(currentDate);
 						feed.setStatus(Feed.STATUS_LAST_SYNC_GOOD);
-						
+
 					} else {
 						if (LOGGING)
 							Log.v(LOGTAG,"Response Code: " + response.getStatusLine().getStatusCode());
@@ -238,9 +252,9 @@ public class Reader
 						}
 					}
 				} else {
-					if (LOGGING) 
+					if (LOGGING)
 						Log.e(LOGTAG, "Failed to sync feed, bad URL");
-					
+
 					feed.setStatus(Feed.STATUS_LAST_SYNC_FAILED_BAD_URL);
 				}
 			}

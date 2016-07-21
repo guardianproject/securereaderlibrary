@@ -1,5 +1,6 @@
 package com.tinymission.rss;
 
+import java.io.InputStream;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -59,6 +60,16 @@ public class Feed extends FeedEntity
 	public Feed()
 	{
 		super(null);
+	}
+
+	// A feed coming from an input stream, unparsed so not for real usage other than handing to the parser
+	private InputStream feedInputStream = null;
+	public Feed(InputStream _feedInputStream) {
+		super(null);
+		feedInputStream = _feedInputStream;
+	}
+	public InputStream getInputStream() {
+		return feedInputStream;
 	}
 	
 	// Copy important bits from previously created feed
