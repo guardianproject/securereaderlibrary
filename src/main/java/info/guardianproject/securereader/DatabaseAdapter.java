@@ -126,6 +126,34 @@ public class DatabaseAdapter
 		return returnValue;
 	}
 
+	public Feed getFeedById(long feedId) {
+		Feed feed = new Feed();
+
+		String query = "select " + DatabaseHelper.FEEDS_TABLE_COLUMN_ID + ", " + DatabaseHelper.FEEDS_TABLE_TITLE + ", "
+				+ DatabaseHelper.FEEDS_TABLE_FEED_URL + " from " + DatabaseHelper.FEEDS_TABLE + " where " + DatabaseHelper.FEEDS_TABLE_COLUMN_ID
+				+ " = ?;";
+
+		if (LOGGING)
+			Log.v(LOGTAG, query);
+
+		if (databaseReady()) {
+			Cursor queryCursor = db.rawQuery(query, new String[] {String.valueOf(feedId)});
+
+			if (queryCursor.getCount() > 0)
+			{
+				if (queryCursor.moveToFirst()) {
+					String title = queryCursor.getString(queryCursor.getColumnIndex(DatabaseHelper.FEEDS_TABLE_TITLE));
+					String url = queryCursor.getString(queryCursor.getColumnIndex(DatabaseHelper.FEEDS_TABLE_FEED_URL));
+					feed.setDatabaseId(feedId);
+					feed.setTitle(title);
+					feed.setFeedURL(url);
+				}
+			}
+			queryCursor.close();
+		}
+		return feed;
+	}
+
 	public String getFeedTitle(long feedId) {
 		String title = "";
 		
