@@ -5,9 +5,6 @@ import java.util.Date;
 
 import info.guardianproject.securereader.SocialReader;
 
-/**
- * Created by vanevery on 7/19/16.
- */
 public class ItemToRSS {
 
     public static String toRSS(Item item, Feed feed) {
