@@ -15,7 +15,7 @@ public class ItemToRSS {
         outputString.append("<rss version=\"2.0\">\n\n");
             outputString.append("<channel>\n");
                 outputString.append("<title>"+feed.getTitle()+"</title>\n");
-                outputString.append("<link>"+feed.getLink()+"</link\n">);
+                outputString.append("<link>"+feed.getLink()+"</link>\n");
                 outputString.append("<description>"+feed.getDescription()+"</description>\n");
                 outputString.append("<item>\n");
                     outputString.append("<title>"+item.getTitle()+"</title>\n");
