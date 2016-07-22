@@ -30,11 +30,16 @@ import info.guardianproject.securereader.SyncServiceFeedFetcher.SyncServiceFeedF
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectOutputStream;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
+import java.io.Writer;
 import java.net.URLEncoder;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
@@ -73,6 +78,7 @@ import android.util.Log;
 
 import com.tinymission.rss.Feed;
 import com.tinymission.rss.Item;
+import com.tinymission.rss.ItemToRSS;
 import com.tinymission.rss.MediaContent;
 import com.tinymission.rss.MediaContent.MediaContentType;
 import com.tinymission.rss.Comment;
@@ -2762,11 +2768,12 @@ public class SocialReader implements ICacheWordSubscriber
 			        
 					// Package content
 					File tempItemContentFile = new File(this.getFileSystemDir(), SocialReader.TEMP_ITEM_CONTENT_FILE_NAME);
-			        ObjectOutputStream output = new ObjectOutputStream(new BufferedOutputStream(new FileOutputStream(tempItemContentFile)));
-			        output.writeObject(itemToShare);
-			        output.flush();
-			        output.close();
-			        
+
+					OutputStream out = new FileOutputStream(tempItemContentFile);
+					Writer w = new BufferedWriter(new OutputStreamWriter(out, "UTF-8"));
+					w.write(ItemToRSS.toRSS(itemToShare, socialReader.databaseAdapter.getFeedById(itemToShare.getFeedId())));
+					w.close();
+
 			        zipOutputStream.putNextEntry(new ZipEntry(tempItemContentFile.getName()));
 			        FileInputStream in = new FileInputStream(tempItemContentFile);
 			        
