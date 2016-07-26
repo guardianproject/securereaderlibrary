@@ -14,6 +14,7 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
+import org.apache.commons.lang.StringEscapeUtils;
 import org.xml.sax.Attributes;
 import org.xml.sax.ErrorHandler;
 import org.xml.sax.InputSource;
@@ -35,7 +36,7 @@ public class Reader
 {
 
 	public final static String LOGTAG = "TinyRSS Reader";
-	public final static boolean LOGGING = true;
+	public final static boolean LOGGING = false;
 
 	private Feed feed;
 
@@ -405,12 +406,13 @@ public class Reader
 		public void endElement(String uri, String localName, String qName) throws SAXException
 		{
 			if (LOGGING)
-				Log.v(LOGTAG,"endElement " + localName + ":" + qName + ":" +  _contentBuilder.toString().trim());
+				Log.v(LOGTAG,"endElement " + localName + ":" + qName + ":" +  StringEscapeUtils.unescapeXml(_contentBuilder.toString().trim()));
 			// get the latest parsed content, if there is any
 			String content = "";
 			if (isContentTag(qName))
 			{
-				content = _contentBuilder.toString().trim();
+				content = StringEscapeUtils.unescapeXml(_contentBuilder.toString().trim());
+
 				if (qName.equalsIgnoreCase("content:encoded"))
 				{
 					qName = "contentEncoded";
