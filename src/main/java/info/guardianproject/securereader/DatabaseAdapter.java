@@ -129,8 +129,13 @@ public class DatabaseAdapter
 	public Feed getFeedById(long feedId) {
 		Feed feed = new Feed();
 
-		String query = "select " + DatabaseHelper.FEEDS_TABLE_COLUMN_ID + ", " + DatabaseHelper.FEEDS_TABLE_TITLE + ", "
-				+ DatabaseHelper.FEEDS_TABLE_FEED_URL + " from " + DatabaseHelper.FEEDS_TABLE + " where " + DatabaseHelper.FEEDS_TABLE_COLUMN_ID
+		String query = "select " + DatabaseHelper.FEEDS_TABLE_COLUMN_ID + ", "
+				+ DatabaseHelper.FEEDS_TABLE_TITLE + ", "
+				+ DatabaseHelper.FEEDS_TABLE_LINK + ", "
+				+ DatabaseHelper.FEEDS_TABLE_DESCRIPTION + ", "
+				+ DatabaseHelper.FEEDS_TABLE_FEED_URL
+				+ " from " + DatabaseHelper.FEEDS_TABLE
+				+ " where " + DatabaseHelper.FEEDS_TABLE_COLUMN_ID
 				+ " = ?;";
 
 		if (LOGGING)
@@ -144,9 +149,14 @@ public class DatabaseAdapter
 				if (queryCursor.moveToFirst()) {
 					String title = queryCursor.getString(queryCursor.getColumnIndex(DatabaseHelper.FEEDS_TABLE_TITLE));
 					String url = queryCursor.getString(queryCursor.getColumnIndex(DatabaseHelper.FEEDS_TABLE_FEED_URL));
+					String link = queryCursor.getString(queryCursor.getColumnIndex(DatabaseHelper.FEEDS_TABLE_LINK));
+					String description = queryCursor.getString(queryCursor.getColumnIndex(DatabaseHelper.FEEDS_TABLE_DESCRIPTION));
+
 					feed.setDatabaseId(feedId);
 					feed.setTitle(title);
 					feed.setFeedURL(url);
+					feed.setDescription(description);
+					feed.setLink(link);
 				}
 			}
 			queryCursor.close();
