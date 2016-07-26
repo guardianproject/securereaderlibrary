@@ -35,7 +35,7 @@ public class Reader
 {
 
 	public final static String LOGTAG = "TinyRSS Reader";
-	public final static boolean LOGGING = false;
+	public final static boolean LOGGING = true;
 
 	private Feed feed;
 
@@ -332,6 +332,8 @@ public class Reader
 				{
 					Item item = new Item(attributes);
 					_entityStack.add(item);
+					if (LOGGING)
+						Log.v(LOGTAG,"Found item");
 					feed.addItem(item);
 				}
 				else if (qName.equals("enclosure"))
@@ -342,6 +344,8 @@ public class Reader
 					{
 						((Item) lastEntity).setMediaContent(mediaContent);
 					}
+					if (LOGGING)
+						Log.v(LOGTAG,"Found enclosure");
 					_entityStack.add(mediaContent);
 				}
 				else if (qName.equals("media:content"))
@@ -352,6 +356,8 @@ public class Reader
 					{
 						((Item) lastEntity).setMediaContent(mediaContent);
 					}
+					if (LOGGING)
+						Log.v(LOGTAG,"Found media content");
 					_entityStack.add(mediaContent);
 				}
 				else if (qName.equals("media:thumbnail"))
@@ -367,6 +373,8 @@ public class Reader
 							item.setMediaThumbnail(mediaThumbnail);
 						}
 					}
+					if (LOGGING)
+						Log.v(LOGTAG,"Found media thumbnail");
 					_entityStack.add(mediaThumbnail);
 				}
 				else if (qName.equals("channel"))
@@ -381,7 +389,9 @@ public class Reader
 					if (lastEntity.getClass() == Feed.class)
 					{						
 						((Feed) lastEntity).setMediaContent(mediaContent);
-					}					
+					}
+					if (LOGGING)
+						Log.v(LOGTAG,"Found image");
 					_entityStack.add(mediaContent);
 				}
 				else
