@@ -24,6 +24,7 @@ dependencies {
     compile 'info.guardianproject.iocipher:IOCipher:0.3'
     compile 'info.guardianproject.cacheword:cachewordlib:0.1'
     compile files('libs/commons-codec.jar')
+    compile files('libs/commons-lang-2.6.jar')
     compile files('libs/gp-bcc-lib.jar')
     //compile files('libs/httpclientandroidlib-1.2.1.jar')
     compile files('libs/jsoup-1.7.2.jar')
