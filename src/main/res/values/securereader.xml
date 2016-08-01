@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">Secure Reader Library</string>
+    
+    <!-- Network OPML service -->
+    <string name="opml_url">https://securereader.guardianproject.info/opml/opml.php</string>
+	
+    <bool name="repeatedly_load_network_opml">false</bool>
+    <bool name="report_metrics">false</bool>
+    
+	<!--  Use fulltext feeds with opml service -->
+	<bool name="fulltextfeeds">true</bool>
+    
+    <string-array name="built_in_feed_names">
+        <item>Big Buffalo</item>
+        <item>Applications</item>
+        <item>EPubs</item>
+    </string-array>
+    
+	<string-array name="feed_urls_with_comments">
+	    <item>https://bigbuffalo.com/feed/</item>
+	</string-array>
+    
+    
+	<string-array name="built_in_feed_urls">
+	    <item>https://bigbuffalo.com/feed/</item>
+        <item>https://securereader.guardianproject.info/swfeed/swfeed.php</item>
+        <item>https://securereader.guardianproject.info/opds/opds.php</item>
+    </string-array>
+
+	<integer name="talk_item_remote_id">-1</integer>
+	<string name="talk_item_feed_url"></string>
+	<string name="talk_item_xmlrpc_url">https://someserver.something/xmlrpc.php</string>
+	
+	<!-- FEED_REFRESH_AGE = 300000; // 5 minutes -->
+	<integer name="feed_refresh_age">300000</integer>
+	
+	<!-- OPML_CHECK_FREQUENCY = 43200000; // .5 day -->
+	<integer name="opml_check_frequency">43200000</integer>
+	
+	<!-- EXPIRATION_CHECK_FREQUENCY = 43200000; // .5 days -->
+	<integer name="expiration_check_frequency">43200000</integer>
+	
+	<!-- XMLRPC_ENDPOINT -->
+	<string name="xmlrpc_endpoint">https://securereader.guardianproject.info/xmlrpc.php</string>
+	
+	<!-- Default values that should be referenced in Settings.java -->
+	<bool name="require_proxy_default">true</bool>
+	<string name="article_expiration_default">Never</string>
+	<string name="default_proxy_type">Tor</string>
+	<string name="sync_mode_default">BitWise</string>	
+	<string name="sync_network_default">WifiAndMobile</string>
+	<string name="sync_frequency_default">InBackground</string>
+	
+	<!-- Limit number of items to keep in database -1 for no limit -->
+	<integer name="item_limit">-1</integer>
+	
+	<!-- Limit amount of media items to keep on disk in megabytes -1 for no limit -->
+	<integer name="media_cache_size">-1</integer>
+
+	<!-- Relaxed HTTPS checking -->
+	<bool name="relaxed_https">false</bool>
+</resources>
