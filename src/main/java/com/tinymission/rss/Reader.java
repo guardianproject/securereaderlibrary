@@ -47,15 +47,23 @@ public class Reader
 	 * its parent content, which allows for embedding html content.
 	 * 
 	 */
-	public final static String[] CONTENT_TAGS = { "title", "link", "language", "pubDate", "lastBuildDate", "docs", "generator", "managingEditor", "webMaster",
-			"guid", "author", "category", "content:encoded", "description", "url", "extrss:id", "wfw:commentRss" };
+	public final static String[] CONTENT_TAGS = {
+			"title", "link", "language", "pubDate", "lastBuildDate",
+			"docs", "generator", "managingEditor", "webMaster", "guid",
+			"author", "category", "content:encoded", "description", "url",
+			"extrss:id", "wfw:commentRss",
+			"id", "updated", "summary", "content", "name", "email"
+	};
+	// title, link,
 
 	/**
 	 * The tags that should be parsed into separate entities, not just
 	 * properties of existing entities.
 	 * 
 	 */
-	public final static String[] ENTITY_TAGS = { "channel", "item", "media:content", "media:thumbnail", "enclosure", "image" };
+	public final static String[] ENTITY_TAGS = { "channel", "item", "media:content", "media:thumbnail", "enclosure", "image",
+		"feed", "entry", "author", "link"
+	};
 
 	/**
 	 * @return whether tag is a valid content tag
@@ -323,13 +331,29 @@ public class Reader
 		@Override
 		public void startElement(String uri, String localName, String qName, Attributes attributes) throws SAXException
 		{
-			if (isContentTag(localName) || isContentTag(qName))
+			if (isEntityTag(qName))
 			{
-				_contentBuilder = new StringBuilder();
-			}
-			else if (isEntityTag(qName))
-			{
-				if (qName.equals("item"))
+				if (qName.equals("link")) {
+					// Link in ATOM is an entity, in RSS a content tag
+					if (attributes != null)
+					{
+						for (int i = 0; i < attributes.getLength(); i++)
+						{
+							String name = attributes.getLocalName(i);
+							if (name.equalsIgnoreCase("href")) {
+								String value = attributes.getValue(i);
+								if (lastEntity.getClass() == Item.class)
+								{
+									((Item) lastEntity).setLink(value);
+								}
+							}
+						}
+					} else {
+						// It's content tag
+						_contentBuilder = new StringBuilder();
+					}
+				}
+				else if (qName.equals("item") || qName.equals("entry"))
 				{
 					Item item = new Item(attributes);
 					_entityStack.add(item);
@@ -378,7 +402,7 @@ public class Reader
 						Log.v(LOGTAG,"Found media thumbnail");
 					_entityStack.add(mediaThumbnail);
 				}
-				else if (qName.equals("channel"))
+				else if (qName.equals("channel") || qName.equals("feed") || qName.equals("entry"))
 				{
 					// this is just the start of the feed
 				}
@@ -400,6 +424,10 @@ public class Reader
 					throw new RuntimeException("Don't know how to create an entity from tag " + qName);
 				}				
 			}
+			else if (isContentTag(localName) || isContentTag(qName))
+			{
+				_contentBuilder = new StringBuilder();
+			}
 		}
 
 		@Override
@@ -411,9 +439,28 @@ public class Reader
 			String content = "";
 			if (isContentTag(qName))
 			{
+				//"id", "updated", "summary", "content", "name", "email"
+				// title, link,
+
 				content = StringEscapeUtils.unescapeXml(_contentBuilder.toString().trim());
 
 				if (qName.equalsIgnoreCase("content:encoded"))
+				{
+					qName = "contentEncoded";
+				}
+				else if (qName.equalsIgnoreCase("id"))
+				{
+					qName = "guid";
+				}
+				else if (qName.equalsIgnoreCase("updated"))
+				{
+					qName = "pubDate";
+				}
+				else if (qName.equalsIgnoreCase("summary"))
+				{
+					qName = "description";
+				}
+				else if (qName.equalsIgnoreCase("content"))
 				{
 					qName = "contentEncoded";
 				}
