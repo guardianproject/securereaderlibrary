@@ -27,7 +27,7 @@ dependencies {
     compile files('libs/commons-lang-2.6.jar')
     compile files('libs/gp-bcc-lib.jar')
     //compile files('libs/httpclientandroidlib-1.2.1.jar')
-    compile files('libs/jsoup-1.7.2.jar')
+    compile files('libs/jsoup-1.9.1.jar')
     compile files('libs/sqlcipher-javadoc.jar')
     compile files('libs/sqlcipher.jar')
     //compile 'info.guardianproject.netcipher:netcipher:1.2'
