@@ -334,6 +334,8 @@ public class Reader
 			if (isEntityTag(qName))
 			{
 				if (qName.equals("link")) {
+					FeedEntity lastEntity = _entityStack.lastElement();
+
 					// Link in ATOM is an entity, in RSS a content tag
 					if (attributes != null)
 					{
