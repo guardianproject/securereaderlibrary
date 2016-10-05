@@ -423,7 +423,9 @@ public class Reader
 				}
 				else
 				{
-					throw new RuntimeException("Don't know how to create an entity from tag " + qName);
+					if (LOGGING)
+						Log.v(LOGTAG, "Don't know how to create an entity from tag " + qName);
+					//throw new RuntimeException("Don't know how to create an entity from tag " + qName);
 				}				
 			}
 			else if (isContentTag(localName) || isContentTag(qName))
