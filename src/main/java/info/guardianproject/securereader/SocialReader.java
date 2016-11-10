@@ -60,6 +60,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.graphics.BitmapFactory;
@@ -83,8 +84,7 @@ import com.tinymission.rss.MediaContent;
 import com.tinymission.rss.MediaContent.MediaContentType;
 import com.tinymission.rss.Comment;
 
-public class SocialReader implements ICacheWordSubscriber
-{
+public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnSharedPreferenceChangeListener {
 	public interface SocialReaderLockListener
 	{
 		void onLocked();
@@ -225,7 +225,8 @@ public class SocialReader implements ICacheWordSubscriber
 		feedsWithComments = applicationContext.getResources().getStringArray(R.array.feed_urls_with_comments);
 		
 		this.settings = new Settings(applicationContext);
-		
+		this.settings.registerChangeListener(this);
+
 		this.cacheWord = new CacheWordHandler(applicationContext, this);
 		cacheWord.connectToService();
 		
@@ -540,16 +541,7 @@ public class SocialReader implements ICacheWordSubscriber
 									Log.e(LOGTAG,"Received null after OPML Parsed");
 							}
 							settings.setLocalOpmlLoaded();
-							manualSyncSubscribedFeeds(
-									new FeedFetcher.FeedFetchedCallback()
-									{
-										@Override
-										public void feedFetched(Feed _feed)
-										{
-											checkMediaDownloadQueue();
-										}
-									}
-									);
+							backgroundSyncSubscribedFeeds();
 						}
 					}
 				);
@@ -2959,5 +2951,17 @@ public class SocialReader implements ICacheWordSubscriber
 		}
 		
 		return talkItem;
+	}
+
+	@Override
+	public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
+		// If we enable a proxy, make sure to update status
+		//
+		if ((Settings.KEY_REQUIRE_PROXY.equals(key) || Settings.KEY_PROXY_TYPE.equals(key)) && settings.requireProxy()) {
+			if (settings.proxyType() == ProxyType.Tor)
+				checkTorStatus();
+			else if (settings.proxyType() == ProxyType.Psiphon)
+				checkPsiphonStatus();
+		}
 	}
 }
