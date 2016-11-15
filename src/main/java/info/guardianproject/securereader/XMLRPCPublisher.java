@@ -77,6 +77,8 @@ public class XMLRPCPublisher extends AsyncTask<Item, Integer, Integer>
 					if (!socialReporter.socialReader.useProxy()) {
 						// Gotta enable that proxy
 						return FAILURE_REASON_NO_PRIVACY_PROXY;
+					} else if (!socialReporter.socialReader.isProxyOnline()) {
+						return FAILURE_REASON_NO_CONNECTION;
 					}
 					XmlRpcClient.setProxy(true, socialReporter.socialReader.getProxyType(), socialReporter.socialReader.getProxyHost(), socialReporter.socialReader.getProxyPort());
 				}
