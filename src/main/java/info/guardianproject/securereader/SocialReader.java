@@ -234,17 +234,20 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	        @Override
 	        public void onReceive(Context context, Intent intent) {
 	            if (TextUtils.equals(intent.getAction(), OrbotHelper.ACTION_STATUS)) {
-	                //String status = intent.getStringExtra(OrbotHelper.EXTRA_STATUS) + " (" + intent.getStringExtra(OrbotHelper.EXTRA_PACKAGE_NAME) + ")";
-	                torRunning = (intent.getStringExtra(OrbotHelper.EXTRA_STATUS).equals(OrbotHelper.STATUS_ON));
+	                String status = intent.getStringExtra(OrbotHelper.EXTRA_STATUS);
+	                torRunning = (status.equals(OrbotHelper.STATUS_ON));
 	                
 	                if(torRunning){
-                        if (TOR_PROXY_TYPE == "HTTP" && intent.hasExtra(OrbotHelper.EXTRA_PROXY_PORT_HTTP))
+                        if (TOR_PROXY_TYPE.equals("HTTP") && intent.hasExtra(OrbotHelper.EXTRA_PROXY_PORT_HTTP))
                         	TOR_PROXY_PORT = intent.getIntExtra(OrbotHelper.EXTRA_PROXY_PORT_HTTP, -1);
                         
-                        if (TOR_PROXY_TYPE == "SOCKS" && intent.hasExtra(OrbotHelper.EXTRA_PROXY_PORT_SOCKS))
+                        if (TOR_PROXY_TYPE.equals("SOCKS") && intent.hasExtra(OrbotHelper.EXTRA_PROXY_PORT_SOCKS))
                         	TOR_PROXY_PORT = intent.getIntExtra(OrbotHelper.EXTRA_PROXY_PORT_SOCKS, -1);
 	                  
-	                }
+	                } else if (status.equals(OrbotHelper.STATUS_STARTS_DISABLED)) {
+						if (LOGGING)
+							Log.v(LOGTAG, "Not allowed to start Tor automatically");
+					}
 	            }
 	        }
 	    };	
