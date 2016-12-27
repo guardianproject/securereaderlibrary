@@ -1174,7 +1174,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 			}
 			
 			// Check Talk Feed
-			if (isOnline() == ONLINE && syncService != null && talkItem != null) {
+			if (isOnline() == ONLINE && syncService != null && talkItem != null && !TextUtils.isEmpty(talkItem.getCommentsUrl())) {
 				if (LOGGING)
 					Log.v(LOGTAG,"Adding talkItem to syncService");
 				syncService.addCommentsSyncTask(talkItem);
@@ -1512,7 +1512,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		talkItem.setGuid(applicationContext.getResources().getString(R.string.talk_item_feed_url));
 		talkItem.setTitle("Example Favorite");
 		talkItem.setFeedId(-1);
-		talkItem.setDescription("This is an examople favorite.  Anything you mark as a favorite will show up in this section and won't be automatically deleted");
+		talkItem.setDescription("This is an example favorite.  Anything you mark as a favorite will show up in this section and won't be automatically deleted");
 		talkItem.dbsetRemotePostId(applicationContext.getResources().getInteger(R.integer.talk_item_remote_id));			
 		talkItem.setCommentsUrl(applicationContext.getResources().getString(R.string.talk_item_feed_url));
 		this.databaseAdapter.addOrUpdateItem(talkItem,itemLimit);
