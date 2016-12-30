@@ -5,7 +5,7 @@ android {
     buildToolsVersion "23.0.2"
 
     defaultConfig {
-        minSdkVersion 9
+        minSdkVersion 15
         //targetSdkVersion 17
     }
 
@@ -20,7 +20,7 @@ android {
 dependencies {
     compile 'net.zetetic:android-database-sqlcipher:3.5.4@aar'
     //compile project(':libnetcipher')
-    compile project(':external:IOCipher')
+    compile project(':external:IOCipher-v0.4')
     compile 'com.android.support:support-v4:23.2.0'
     compile 'com.google.guava:guava:18.0'
     //compile 'info.guardianproject.iocipher:IOCipher:0.3'
