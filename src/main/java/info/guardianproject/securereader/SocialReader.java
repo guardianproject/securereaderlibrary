@@ -60,6 +60,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.graphics.BitmapFactory;
@@ -83,8 +84,7 @@ import com.tinymission.rss.MediaContent;
 import com.tinymission.rss.MediaContent.MediaContentType;
 import com.tinymission.rss.Comment;
 
-public class SocialReader implements ICacheWordSubscriber
-{
+public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnSharedPreferenceChangeListener {
 	public interface SocialReaderLockListener
 	{
 		void onLocked();
@@ -225,7 +225,8 @@ public class SocialReader implements ICacheWordSubscriber
 		feedsWithComments = applicationContext.getResources().getStringArray(R.array.feed_urls_with_comments);
 		
 		this.settings = new Settings(applicationContext);
-		
+		this.settings.registerChangeListener(this);
+
 		this.cacheWord = new CacheWordHandler(applicationContext, this);
 		cacheWord.connectToService();
 		
@@ -233,17 +234,20 @@ public class SocialReader implements ICacheWordSubscriber
 	        @Override
 	        public void onReceive(Context context, Intent intent) {
 	            if (TextUtils.equals(intent.getAction(), OrbotHelper.ACTION_STATUS)) {
-	                //String status = intent.getStringExtra(OrbotHelper.EXTRA_STATUS) + " (" + intent.getStringExtra(OrbotHelper.EXTRA_PACKAGE_NAME) + ")";
-	                torRunning = (intent.getStringExtra(OrbotHelper.EXTRA_STATUS).equals(OrbotHelper.STATUS_ON));
+	                String status = intent.getStringExtra(OrbotHelper.EXTRA_STATUS);
+	                torRunning = (status.equals(OrbotHelper.STATUS_ON));
 	                
 	                if(torRunning){
-                        if (TOR_PROXY_TYPE == "HTTP" && intent.hasExtra(OrbotHelper.EXTRA_PROXY_PORT_HTTP))
+                        if (TOR_PROXY_TYPE.equals("HTTP") && intent.hasExtra(OrbotHelper.EXTRA_PROXY_PORT_HTTP))
                         	TOR_PROXY_PORT = intent.getIntExtra(OrbotHelper.EXTRA_PROXY_PORT_HTTP, -1);
                         
-                        if (TOR_PROXY_TYPE == "SOCKS" && intent.hasExtra(OrbotHelper.EXTRA_PROXY_PORT_SOCKS))
+                        if (TOR_PROXY_TYPE.equals("SOCKS") && intent.hasExtra(OrbotHelper.EXTRA_PROXY_PORT_SOCKS))
                         	TOR_PROXY_PORT = intent.getIntExtra(OrbotHelper.EXTRA_PROXY_PORT_SOCKS, -1);
 	                  
-	                }
+	                } else if (status.equals(OrbotHelper.STATUS_STARTS_DISABLED)) {
+						if (LOGGING)
+							Log.v(LOGTAG, "Not allowed to start Tor automatically");
+					}
 	            }
 	        }
 	    };	
@@ -540,16 +544,7 @@ public class SocialReader implements ICacheWordSubscriber
 									Log.e(LOGTAG,"Received null after OPML Parsed");
 							}
 							settings.setLocalOpmlLoaded();
-							manualSyncSubscribedFeeds(
-									new FeedFetcher.FeedFetchedCallback()
-									{
-										@Override
-										public void feedFetched(Feed _feed)
-										{
-											checkMediaDownloadQueue();
-										}
-									}
-									);
+							backgroundSyncSubscribedFeeds();
 						}
 					}
 				);
@@ -1179,7 +1174,7 @@ public class SocialReader implements ICacheWordSubscriber
 			}
 			
 			// Check Talk Feed
-			if (isOnline() == ONLINE && syncService != null && talkItem != null) {
+			if (isOnline() == ONLINE && syncService != null && talkItem != null && !TextUtils.isEmpty(talkItem.getCommentsUrl())) {
 				if (LOGGING)
 					Log.v(LOGTAG,"Adding talkItem to syncService");
 				syncService.addCommentsSyncTask(talkItem);
@@ -1517,7 +1512,7 @@ public class SocialReader implements ICacheWordSubscriber
 		talkItem.setGuid(applicationContext.getResources().getString(R.string.talk_item_feed_url));
 		talkItem.setTitle("Example Favorite");
 		talkItem.setFeedId(-1);
-		talkItem.setDescription("This is an examople favorite.  Anything you mark as a favorite will show up in this section and won't be automatically deleted");
+		talkItem.setDescription("This is an example favorite.  Anything you mark as a favorite will show up in this section and won't be automatically deleted");
 		talkItem.dbsetRemotePostId(applicationContext.getResources().getInteger(R.integer.talk_item_remote_id));			
 		talkItem.setCommentsUrl(applicationContext.getResources().getString(R.string.talk_item_feed_url));
 		this.databaseAdapter.addOrUpdateItem(talkItem,itemLimit);
@@ -2959,5 +2954,17 @@ public class SocialReader implements ICacheWordSubscriber
 		}
 		
 		return talkItem;
+	}
+
+	@Override
+	public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
+		// If we enable a proxy, make sure to update status
+		//
+		if ((Settings.KEY_REQUIRE_PROXY.equals(key) || Settings.KEY_PROXY_TYPE.equals(key)) && settings.requireProxy()) {
+			if (settings.proxyType() == ProxyType.Tor)
+				checkTorStatus();
+			else if (settings.proxyType() == ProxyType.Psiphon)
+				checkPsiphonStatus();
+		}
 	}
 }

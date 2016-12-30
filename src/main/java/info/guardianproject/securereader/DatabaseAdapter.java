@@ -2350,7 +2350,7 @@ public class DatabaseAdapter
 				
 					ContentValues values = new ContentValues();
 					values.put(DatabaseHelper.COMMENTS_TABLE_ITEM_ID, item.getDatabaseId());
-					values.put(DatabaseHelper.COMMENTS_TABLE_TITLE, item.getTitle());
+					values.put(DatabaseHelper.COMMENTS_TABLE_TITLE, itemComment.getTitle());
 					values.put(DatabaseHelper.COMMENTS_TABLE_LINK, itemComment.getLink());
 					values.put(DatabaseHelper.COMMENTS_TABLE_AUTHOR, itemComment.getAuthor());
 					values.put(DatabaseHelper.COMMENTS_TABLE_DESCRIPTION, itemComment.getDescription());
@@ -2418,7 +2418,7 @@ public class DatabaseAdapter
 		
 		ContentValues values = new ContentValues();
 		values.put(DatabaseHelper.COMMENTS_TABLE_ITEM_ID, item.getDatabaseId());
-		values.put(DatabaseHelper.COMMENTS_TABLE_TITLE, item.getTitle());
+		values.put(DatabaseHelper.COMMENTS_TABLE_TITLE, itemComment.getTitle());
 		values.put(DatabaseHelper.COMMENTS_TABLE_LINK, itemComment.getLink());
 		values.put(DatabaseHelper.COMMENTS_TABLE_AUTHOR, itemComment.getAuthor());
 		values.put(DatabaseHelper.COMMENTS_TABLE_DESCRIPTION, itemComment.getDescription());

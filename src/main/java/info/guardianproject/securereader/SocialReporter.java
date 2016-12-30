@@ -29,7 +29,7 @@ public class SocialReporter
 	public static final String LOGTAG = "SocialReporter";
 	public static final boolean LOGGING = false;
 	
-	public static final boolean REQUIRE_PROXY = true;
+	public static boolean REQUIRE_PROXY = true;
 	
 	SocialReader socialReader;
 	Context applicationContext;

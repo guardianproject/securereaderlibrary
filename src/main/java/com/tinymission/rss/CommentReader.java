@@ -48,7 +48,7 @@ public class CommentReader
 	 * 
 	 */
 	public final static String[] CONTENT_TAGS = { "title", "link", "language", "pubDate", "lastBuildDate", "docs", "generator", "managingEditor", "webMaster",
-			"guid", "author", "category", "content:encoded", "description", "url", "extrss:id" };
+			"guid", "author", "category", "content:encoded", "description", "url", "extrss:id", "dc:creator" };
 
 	/**
 	 * The tags that should be parsed into separate entities, not just
@@ -282,6 +282,10 @@ public class CommentReader
 				if (qName.equalsIgnoreCase("content:encoded"))
 				{
 					qName = "contentEncoded";
+				}
+				else if (qName.equalsIgnoreCase("dc:creator"))
+				{
+					qName = "author";
 				}
 				else if (qName.equalsIgnoreCase("extrss:id"))
 				{
