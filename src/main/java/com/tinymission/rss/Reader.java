@@ -295,6 +295,12 @@ public class Reader
 				ise.printStackTrace();
 			feed.setStatus(Feed.STATUS_LAST_SYNC_PARSE_ERROR);
 		}
+		catch (Exception e)
+		{
+			if (LOGGING)
+				e.printStackTrace();
+			feed.setStatus(Feed.STATUS_LAST_SYNC_PARSE_ERROR);
+		}
 		return feed;
 	}
 

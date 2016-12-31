@@ -2217,6 +2217,10 @@ public class DatabaseAdapter
 	public long addOrUpdateItemMedia(Item item, MediaContent itemMedia)
 	{
 		long returnValue = -1;
+		// Check that we have a valid url
+		if (itemMedia == null || itemMedia.getUrl() == null) {
+			return returnValue; // Abort
+		}
 		if (itemMedia.getDatabaseId() == MediaContent.DEFAULT_DATABASE_ID)
 		{
 			String query = "select " + DatabaseHelper.ITEM_MEDIA_TABLE_COLUMN_ID + ", " + DatabaseHelper.ITEM_MEDIA_URL + ", "

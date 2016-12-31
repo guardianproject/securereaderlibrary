@@ -728,14 +728,15 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 							if (outlines != null) {
 								for (int i = 0; i < outlines.size(); i++) {
 									OPMLParser.OPMLOutline outlineElement = outlines.get(i);
-									
-									Feed newFeed = new Feed(outlineElement.text, outlineElement.xmlUrl);
-									newFeed.setSubscribed(outlineElement.subscribe && !databaseAdapter.isFeedUnfollowed(outlineElement.xmlUrl));
+									if (outlineElement.xmlUrl != null) {
+										Feed newFeed = new Feed(outlineElement.text, outlineElement.xmlUrl.trim());
+										newFeed.setSubscribed(outlineElement.subscribe && !databaseAdapter.isFeedUnfollowed(outlineElement.xmlUrl));
 
-									if (LOGGING)
-										Log.v(LOGTAG, "**New Feed: " + newFeed.getFeedURL() + " " + newFeed.isSubscribed());
-									
-									databaseAdapter.addOrUpdateFeed(newFeed);
+										if (LOGGING)
+											Log.v(LOGTAG, "**New Feed: " + newFeed.getFeedURL() + " " + newFeed.isSubscribed());
+
+										databaseAdapter.addOrUpdateFeed(newFeed);
+									}
 								}
 							} else {
 								if (LOGGING)
