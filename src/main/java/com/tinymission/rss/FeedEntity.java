@@ -82,13 +82,14 @@ public class FeedEntity implements Serializable
 			Method m = getMethod(name);
 			if (m != null)
 			{
-				if (m.getParameterTypes()[0] == String.class)
+				Class<?> parameterType = m.getParameterTypes()[0];
+				if (parameterType == String.class)
 				{ // it's just a string argument, pass the string
 					m.invoke(this, value);
 					if (LOGGING)
 						Log.v(logTag, "Assigned property " + name + " string value: " + value);
 				}
-				else if (m.getParameterTypes()[0] == Integer.class)
+				else if (parameterType == Integer.class || parameterType == int.class)
 				{ // it's an int argument, we can handle that
 					int intVal = Integer.parseInt(value);
 					m.invoke(this, intVal);
