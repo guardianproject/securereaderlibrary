@@ -50,7 +50,7 @@ public class Reader
 	public final static String[] CONTENT_TAGS = {
 			"title", "link", "language", "pubDate", "lastBuildDate",
 			"docs", "generator", "managingEditor", "webMaster", "guid",
-			"author", "category", "content:encoded", "description", "url",
+			"author", "dc:creator", "category", "content:encoded", "description", "url",
 			"extrss:id", "wfw:commentRss",
 			"id", "updated", "summary", "content", "name", "email"
 	};
@@ -479,7 +479,11 @@ public class Reader
 					if (LOGGING)
 						Log.v(LOGTAG,"Got a remotePostId:" + content);
 					qName = "remotePostId";
-				} 
+				}
+				else if (qName.equalsIgnoreCase("dc:creator"))
+				{
+					qName = "author";
+				}
 				else if (qName.equalsIgnoreCase("wfw:commentRss")) 
 				{
 					if (LOGGING)
