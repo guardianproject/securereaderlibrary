@@ -1,19 +1,16 @@
 /*
- * 
- * Wordpress-java
- * http://code.google.com/p/wordpress-java/
- * 
- * Copyright 2012 Can Bican <can@bican.net>
- * See the file 'COPYING' in the distribution for licensing terms.
- * 
+ * Wordpress-java https://github.com/canbican/wordpress-java/ Copyright
+ * 2012-2015 Can Bican <can@bican.net> See the file 'COPYING' in the
+ * distribution for licensing terms.
  */
 package net.bican.wordpress;
 
+import net.bican.wordpress.util.StringHeader;
+
 /**
  * Comment Count object for a blog post.
- * 
- * @author Fred Potter &lt;fpoptter@gmail.com&gt;
  *
+ * @author Fred Potter
  */
 public class CommentCount extends XmlRpcMapped implements StringHeader {
   
@@ -30,24 +27,10 @@ public class CommentCount extends XmlRpcMapped implements StringHeader {
   }
   
   /**
-   * @param approved Sets number of approved comments.
-   */
-  public void setApproved(Integer approved) {
-    this.approved = approved;
-  }
-
-  /**
    * @return Number of comments awaiting moderation
    */
   public Integer getAwaiting_moderation() {
     return this.awaiting_moderation;
-  }
-
-  /**
-   * @param awaitingModeration Number of comments awaiting moderation.
-   */
-  public void setAwaiting_moderation(Integer awaitingModeration) {
-    this.awaiting_moderation = awaitingModeration;
   }
 
   /**
@@ -58,10 +41,16 @@ public class CommentCount extends XmlRpcMapped implements StringHeader {
   }
 
   /**
-   * @param spam Number of comments that are spam
+   * (non-Javadoc)
+   *
+   * @see net.bican.wordpress.util.StringHeader#getStringHeader()
    */
-  public void setSpam(Integer spam) {
-    this.spam = spam;
+  @Override
+  @SuppressWarnings("nls")
+  public String getStringHeader() {
+    final String TAB = ":";
+    return "Approved" + TAB + "Awaiting Moderation" + TAB + "Spam" + TAB
+        + "Total Comments";
   }
 
   /**
@@ -72,24 +61,35 @@ public class CommentCount extends XmlRpcMapped implements StringHeader {
   }
 
   /**
-   * @param totalComments Total number of comments.
+   * @param approved
+   *          Sets number of approved comments.
    */
-  public void setTotal_comments(Integer totalComments) {
-    this.total_comments = totalComments;
+  public void setApproved(final Integer approved) {
+    this.approved = approved;
   }
 
   /**
-   * (non-Javadoc)
-   * 
-   * @see net.bican.wordpress.StringHeader#getStringHeader()
+   * @param awaitingModeration
+   *          Number of comments awaiting moderation.
    */
-  @Override
-  @SuppressWarnings("nls")
-  public String getStringHeader() {
-    final String TAB = ":";
-    return "Approved" + TAB + "Awaiting Moderation" + TAB + "Spam" + TAB
-        + "Total Comments";
+  public void setAwaiting_moderation(final Integer awaitingModeration) {
+    this.awaiting_moderation = awaitingModeration;
   }
-  
-  
+
+  /**
+   * @param spam
+   *          Number of comments that are spam
+   */
+  public void setSpam(final Integer spam) {
+    this.spam = spam;
+  }
+
+  /**
+   * @param totalComments
+   *          Total number of comments.
+   */
+  public void setTotal_comments(final Integer totalComments) {
+    this.total_comments = totalComments;
+  }
+
 }
