@@ -1508,20 +1508,22 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 			if (LOGGING)
 				Log.v(LOGTAG,"Database not empty, not inserting default feeds");
 		}
-		
-		// Create talk item
-		talkItem = new Item();
-		talkItem.setFavorite(true); // So it doesn't delete
-		talkItem.setGuid(applicationContext.getResources().getString(R.string.talk_item_feed_url));
-		talkItem.setTitle("Example Favorite");
-		talkItem.setFeedId(-1);
-		talkItem.setDescription("This is an example favorite.  Anything you mark as a favorite will show up in this section and won't be automatically deleted");
-		talkItem.dbsetRemotePostId(applicationContext.getResources().getInteger(R.integer.talk_item_remote_id));			
-		talkItem.setCommentsUrl(applicationContext.getResources().getString(R.string.talk_item_feed_url));
-		this.databaseAdapter.addOrUpdateItem(talkItem,itemLimit);
-		if (LOGGING)
-			Log.v(LOGTAG,"talkItem has database ID " + talkItem.getDatabaseId());		
 
+		int talkItemId = applicationContext.getResources().getInteger(R.integer.talk_item_remote_id);
+		if (talkItemId != -1) {
+			// Create talk item
+			talkItem = new Item();
+			talkItem.setFavorite(true); // So it doesn't delete
+			talkItem.setGuid(applicationContext.getResources().getString(R.string.talk_item_feed_url));
+			talkItem.setTitle("Example Favorite");
+			talkItem.setFeedId(-1);
+			talkItem.setDescription("This is an example favorite.  Anything you mark as a favorite will show up in this section and won't be automatically deleted");
+			talkItem.dbsetRemotePostId(talkItemId);
+			talkItem.setCommentsUrl(applicationContext.getResources().getString(R.string.talk_item_feed_url));
+			this.databaseAdapter.addOrUpdateItem(talkItem, itemLimit);
+			if (LOGGING)
+				Log.v(LOGTAG, "talkItem has database ID " + talkItem.getDatabaseId());
+		}
 		if (LOGGING)
 			Log.v(LOGTAG,"databaseAdapter initialized");
 	}
