@@ -30,7 +30,7 @@ import net.bican.wordpress.Wordpress;
  */
 public class XMLRPCPublisher extends AsyncTask<Item, Integer, Integer>
 {
-	public final static boolean LOGGING = true;
+	public final static boolean LOGGING = false;
 	public final static String LOGTAG = "XMLRPC PUBLISHER";
 
 	public static final int FAILURE_REASON_NO_PRIVACY_PROXY = -1;
