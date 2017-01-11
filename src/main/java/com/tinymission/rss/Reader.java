@@ -42,6 +42,8 @@ public class Reader
 
 	private SocialReader socialReader;
 
+	InputStream is;
+
 	/**
 	 * The allowed tags to parse content from (everything else gets lumped into
 	 * its parent content, which allows for embedding html content.
@@ -103,6 +105,16 @@ public class Reader
 		feed = _feed;
 	}
 
+	public void stop() {
+		if (is != null) {
+			try {
+				is.close();
+			} catch (IOException ioe) {
+				if (LOGGING) ioe.printStackTrace();
+			}
+		}
+	}
+
 	/**
 	 * Actually grabs the feed from the URL and parses it into java objects.
 	 * 
@@ -161,9 +173,9 @@ public class Reader
 			}
 
 			final String PREFIX = "file:///android_asset/";
+
 			// If it's an input stream or a file url then we are dealing with an input stream
 			if (feed.getInputStream() != null || feedUrl.startsWith("file:///")) {
-				InputStream is = null;
 
 				// If it's not an input stream, get the inputstream
 				if (feed.getInputStream() == null) {

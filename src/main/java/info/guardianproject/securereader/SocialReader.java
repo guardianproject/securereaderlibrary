@@ -565,7 +565,8 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 					Log.v(LOGTAG,"Checking Article Expirations");
 				settings.setLastItemExpirationCheckTime(System.currentTimeMillis());
 				Date expirationDate = new Date(System.currentTimeMillis() - settings.articleExpirationMillis());
-				databaseAdapter.deleteExpiredItems(expirationDate);
+				if (databaseAdapter != null && databaseAdapter.databaseReady())
+					databaseAdapter.deleteExpiredItems(expirationDate);
 			}
 		} else {
 			if (LOGGING)
@@ -1566,6 +1567,10 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 				Log.v(LOGTAG, "Running on KITKAT or greater");
 			}
 			java.io.File[] possibleLocations = applicationContext.getExternalFilesDirs(null);
+			if (LOGGING) {
+
+				Log.v(LOGTAG, "Got " + possibleLocations.length + " locations");
+			}
 			long largestSize = 0;
 			for (int l = 0; l < possibleLocations.length; l++) {
 				if (possibleLocations[l] != null && possibleLocations[l].getAbsolutePath() != null) {	
@@ -1719,7 +1724,13 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	private void deleteFileSystem()
 	{
 		if (vfs != null && vfs.isMounted()) {
-			vfs.unmount();
+			try {
+				vfs.unmount();
+			} catch (IllegalStateException ise) {
+				if (LOGGING) ise.printStackTrace();
+				ise.printStackTrace();
+			}
+			vfs.deleteContainer();
 			vfs = null;
 		}
 
@@ -1735,7 +1746,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 			{
 				possibleDirFiles[i].delete();
 			}
-			possibleDir.delete();	
+			possibleDir.delete();
 		}
 		
 		// This is a backup, just in case they have a removable sd card inserted but also have
@@ -2320,13 +2331,23 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 			databaseAdapter = null;
 		}
 
+		/* Trying this
 		if (vfs != null && vfs.isMounted()) {
 			if (LOGGING)
 				Log.v(LOGTAG, "vfs.unmount(); vfs = null;");
-			
-			vfs.unmount();
+
+
+
+			try {
+				vfs.unmount();
+			} catch (IllegalStateException ise) {
+				if (LOGGING) ise.printStackTrace();
+				ise.printStackTrace();
+			}
+			//vfs.deleteContainer();
 			vfs = null;
 		}
+		*/
 		
 		if (LOGGING)
 			Log.v(LOGTAG, "applicationContext.deleteDatabase(DatabaseHelper.DATABASE_NAME);");
@@ -2334,7 +2355,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		applicationContext.deleteDatabase(DatabaseHelper.DATABASE_NAME);
 
 		if (LOGGING)
-			Log.v(LOGTAG, "deleteFileSystem()");
+			Log.v(LOGTAG, "NOT deleteFileSystem()");
 		deleteFileSystem();
 		
 		// Reset Prefs to initial state
@@ -2867,7 +2888,8 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 			{
 				mediaContent.setWidth(o.outWidth);
 				mediaContent.setHeight(o.outHeight);
-				databaseAdapter.updateItemMedia(mediaContent);
+				if (databaseAdapter != null && databaseAdapter.databaseReady())
+					databaseAdapter.updateItemMedia(mediaContent);
 			}
 		}
 		catch (FileNotFoundException e)

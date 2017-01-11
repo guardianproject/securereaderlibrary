@@ -42,6 +42,8 @@ public class CommentReader
 
 	private SocialReader socialReader;
 
+	InputStream is;
+
 	/**
 	 * The allowed tags to parse content from (everything else gets lumped into
 	 * its parent content, which allows for embedding html content.
@@ -93,6 +95,17 @@ public class CommentReader
 		socialReader = _socialReader;
 		_item.setStatus(Item.STATUS_SYNC_IN_PROGRESS);
 		item = _item;
+	}
+
+
+	public void stop() {
+		if (is != null) {
+			try {
+				is.close();
+			} catch (IOException ioe) {
+				if (LOGGING) ioe.printStackTrace();
+			}
+		}
 	}
 
 	/**
@@ -160,7 +173,7 @@ public class CommentReader
 						if (LOGGING)
 							Log.v(LOGTAG,"Response Code is good");
 						
-						InputStream is = response.getEntity().getContent();
+						is = response.getEntity().getContent();
 						xr.parse(new InputSource(is));
 						
 						is.close();
