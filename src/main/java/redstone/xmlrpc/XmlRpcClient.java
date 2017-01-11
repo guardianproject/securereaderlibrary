@@ -40,6 +40,7 @@ import ch.boye.httpclientandroidlib.client.methods.HttpPost;
 import ch.boye.httpclientandroidlib.entity.AbstractHttpEntity;
 import ch.boye.httpclientandroidlib.entity.StringEntity;
 import ch.boye.httpclientandroidlib.message.BasicHeader;
+import info.guardianproject.securereader.SocialReader;
 
 /**
  * An XmlRpcClient represents a connection to an XML-RPC enabled server. It
@@ -496,7 +497,7 @@ public class XmlRpcClient extends XmlRpcParser implements XmlRpcInvocationHandle
 		}
 
 		HttpPost request = new HttpPost(url.toExternalForm());
-
+		request.setHeader("User-Agent", SocialReader.USERAGENT);
 		request.setHeader("Content-Type", "text/xml; charset=" + XmlRpcMessages.getString("XmlRpcClient.Encoding"));
 
 		if (requestProperties != null)
