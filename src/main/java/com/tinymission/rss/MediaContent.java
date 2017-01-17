@@ -1,10 +1,12 @@
 package com.tinymission.rss;
 
 import java.io.Serializable;
+import java.net.URL;
 import java.util.Locale;
 
 import org.xml.sax.Attributes;
 
+import android.text.TextUtils;
 import android.util.Log;
 
 public class MediaContent extends FeedEntity implements Serializable
@@ -191,7 +193,17 @@ public class MediaContent extends FeedEntity implements Serializable
 	public String getType()
 	{
 		if (type == null) {
-			setType(android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(android.webkit.MimeTypeMap.getFileExtensionFromUrl(url)));					
+			String extension = android.webkit.MimeTypeMap.getFileExtensionFromUrl(url);
+			if (TextUtils.isEmpty(extension)) {
+				try {
+					URL theUrl = new URL(url);
+					String path = theUrl.getPath();
+					if (!TextUtils.isEmpty(path) && path.lastIndexOf('.') > 0) {
+						extension = path.substring(path.lastIndexOf('.') + 1);
+					}
+				} catch (Exception ignored) {}
+			}
+			setType(android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension));
 		}
 		return type;
 	}
