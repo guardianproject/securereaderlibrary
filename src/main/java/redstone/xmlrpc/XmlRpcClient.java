@@ -352,7 +352,7 @@ public class XmlRpcClient extends XmlRpcParser implements XmlRpcInvocationHandle
 			writer.write("</methodCall>");
 
 			String xmlOut = ((StringWriter) writer).getBuffer().toString();
-			StringEntity entity = new StringEntity(xmlOut);
+			StringEntity entity = new StringEntity(xmlOut, XmlRpcMessages.getString("XmlRpcClient.Encoding"));
 			entity.setContentType(new BasicHeader("Content-Type", "text/xml; charset=" + XmlRpcMessages.getString("XmlRpcClient.Encoding")));
 
 			Log.d("XmlRpc", xmlOut);
