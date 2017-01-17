@@ -165,12 +165,15 @@ public class SyncService extends Service {
     	}
 
 		void stop() {
-			if (type == TYPE_FEED) {
-				stopFeedFetcher();
-			} else if (type == TYPE_MEDIA) {
-				stopMediaDownloader();
-			} else if (type == TYPE_COMMENTS) {
-				stopCommentsFeedFetcher();
+			try {
+				if (type == TYPE_FEED) {
+					stopFeedFetcher();
+				} else if (type == TYPE_MEDIA) {
+					stopMediaDownloader();
+				} else if (type == TYPE_COMMENTS) {
+					stopCommentsFeedFetcher();
+				}
+			} catch (Exception ignored) {
 			}
 		}
     	
