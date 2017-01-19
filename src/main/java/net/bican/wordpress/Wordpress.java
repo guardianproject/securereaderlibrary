@@ -1502,7 +1502,13 @@ public class Wordpress {
           throws InsufficientRightsException, FileUploadException, XmlRpcFault,
           IOException {
     try {
-      String filename = file.getName() + "." + MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType);
+      String extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType);
+      if (extension == null) {
+        if (mimeType != null && mimeType.contentEquals("audio/mp4")) {
+          extension = ".m4a";
+        }
+      }
+      String filename = file.getName() + "." + extension;
       final XmlRpcStruct data = new XmlRpcStruct();
       data.put("name", filename); //$NON-NLS-1$
       data.put("type", mimeType); //$NON-NLS-1$
