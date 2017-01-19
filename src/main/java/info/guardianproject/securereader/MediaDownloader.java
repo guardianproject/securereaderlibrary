@@ -193,17 +193,7 @@ public class MediaDownloader extends AsyncTask<MediaContent, Integer, File>
 
 				socialReader.getStoreBitmapDimensions(mediaContent);
 			}
-			catch (ClientProtocolException e)
-			{
-				if (LOGGING)
-					e.printStackTrace();
-			}
-			catch (IOException e)
-			{
-				if (LOGGING)
-					e.printStackTrace();
-			}
-			catch (URISyntaxException e)
+			catch (Exception e)
 			{
 				if (LOGGING)
 					e.printStackTrace();

@@ -262,19 +262,7 @@ public class SyncServiceMediaDownloader implements Runnable
 				sr.getStoreBitmapDimensions(mediaContent);
 				sr.setMediaContentDownloaded(mediaContent);
 			}
-			catch (ClientProtocolException e)
-			{
-				// TODO Auto-generated catch block
-				if (LOGGING)
-					e.printStackTrace();
-			}
-			catch (IOException e)
-			{
-				// TODO Auto-generated catch block
-				if (LOGGING)
-					e.printStackTrace();
-			}
-			catch (URISyntaxException e)
+			catch (Exception e)
 			{
 				// TODO Auto-generated catch block
 				if (LOGGING)
