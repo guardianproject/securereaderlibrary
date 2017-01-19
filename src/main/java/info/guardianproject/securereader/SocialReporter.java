@@ -7,9 +7,7 @@ import android.util.Log;
 import com.tinymission.rss.Comment;
 import com.tinymission.rss.Item;
 
-import info.guardianproject.securereader.XMLRPCPublisher;
 import info.guardianproject.securereader.XMLRPCPublisher.XMLRPCPublisherCallback;
-import info.guardianproject.securereader.XMLRPCCommentPublisher;
 import info.guardianproject.securereader.XMLRPCCommentPublisher.XMLRPCCommentPublisherCallback;
 
 import net.bican.wordpress.Wordpress;
@@ -172,7 +170,24 @@ public class SocialReporter
 				Log.e(LOGTAG,"Database not ready");
 		}
 	}
-	
+
+	public void deletePost(Item story, XMLRPCDeleter.XMLRPCDeleterCallback callback)
+	{
+		if (LOGGING)
+			Log.v(LOGTAG, "deletePost");
+
+		if (socialReader.databaseAdapter != null && socialReader.databaseAdapter.databaseReady())
+		{
+			// Do the actual publishing in a background thread
+			XMLRPCDeleter deleter = new XMLRPCDeleter(this);
+			deleter.setXMLRPCDeleterCallback(callback);
+			deleter.execute(story);
+		} else {
+			if (LOGGING)
+				Log.e(LOGTAG,"Database not ready");
+		}
+	}
+
 	public void postComment(Comment comment, XMLRPCCommentPublisherCallback callback)
 	{
 		if (LOGGING)
