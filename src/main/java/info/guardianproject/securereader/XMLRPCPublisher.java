@@ -22,6 +22,7 @@ import net.bican.wordpress.Enclosure;
 import net.bican.wordpress.MediaItem;
 import net.bican.wordpress.MediaItemUploadResult;
 import net.bican.wordpress.Post;
+import net.bican.wordpress.Term;
 import net.bican.wordpress.Wordpress;
 
 /**
@@ -131,7 +132,7 @@ public class XMLRPCPublisher extends AsyncTask<Item, Integer, Integer>
 					post.setPost_type("post");
 					post.setPost_title(item.getTitle());
 					post.setPost_status("publish");
-	
+
 					StringBuffer sbBody = new StringBuffer();
 					sbBody.append(item.getDescription());
 
@@ -190,6 +191,30 @@ public class XMLRPCPublisher extends AsyncTask<Item, Integer, Integer>
 
 					post.setPost_content(sbBody.toString());
 					post.setComment_status("open");
+					if (item.getTags() != null && item.getTags().size() > 0) {
+						ArrayList<Term> tags = new ArrayList<>();
+						for (String tag : item.getTags()) {
+							Term newTerm = new Term();
+							newTerm.setTaxonomy("post_tag");
+							newTerm.setName(tag);
+							try {
+								if (LOGGING)
+									Log.d(LOGTAG, "Creating tag for " + newTerm.getName());
+								Integer id = wordpress.newTerm(newTerm);
+								if (LOGGING)
+									Log.d(LOGTAG, "Got id " + id);
+								newTerm.setTerm_id(id);
+								tags.add(newTerm);
+							} catch(Exception e) {
+								e.printStackTrace();
+								if (LOGGING)
+									Log.d(LOGTAG, "Got error " + e.toString());
+							}
+						}
+						if (tags.size() > 0) {
+							post.setTerms(tags);
+						}
+					}
 					if (thumbnail != -1) {
 						// Set featured image
 						post.setPost_thumbnail(thumbnail);
@@ -199,6 +224,7 @@ public class XMLRPCPublisher extends AsyncTask<Item, Integer, Integer>
 						Log.v(LOGTAG, "Posted: " + postId);
 
 					if (postId != 0) {
+						item.dbsetRemotePostId(postId);
 						// Link media to post
 						for (MediaItemUploadResult mediaUpload : mediaObjects) {
 							Post mediaUpdate = new Post();
