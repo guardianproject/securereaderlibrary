@@ -1453,7 +1453,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		return returnFeed;
 	}
 
-	public Feed getPlaylist(Feed feed) {		
+	public Feed getPlaylist(Feed feed) {
 		
 		ArrayList<String> tags = new ArrayList<String>();
 		// Tempo
@@ -2993,6 +2993,21 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 				checkTorStatus();
 			else if (settings.proxyType() == ProxyType.Psiphon)
 				checkPsiphonStatus();
+		}
+	}
+
+	public void deleteItem(Item story)
+	{
+		if (LOGGING)
+			Log.v(LOGTAG, "deleteItem");
+		if (databaseAdapter != null && databaseAdapter.databaseReady())
+		{
+			databaseAdapter.deleteItem(story.getDatabaseId());
+		}
+		else
+		{
+			if (LOGGING)
+				Log.e(LOGTAG,"Database not ready");
 		}
 	}
 }

@@ -138,17 +138,7 @@ public class SocialReporter
 
 	public void deleteDraft(Item story)
 	{
-		if (LOGGING)
-			Log.v(LOGTAG, "deleteDraft");
-		if (socialReader.databaseAdapter != null && socialReader.databaseAdapter.databaseReady())
-		{
-			socialReader.databaseAdapter.deleteItem(story.getDatabaseId());
-		}
-		else 
-		{
-			if (LOGGING)
-				Log.e(LOGTAG,"Database not ready");
-		}
+		socialReader.deleteItem(story);
 	}
 
 	public void publish(Item story, XMLRPCPublisherCallback callback)

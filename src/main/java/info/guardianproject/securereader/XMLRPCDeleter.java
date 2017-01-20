@@ -44,6 +44,7 @@ public class XMLRPCDeleter extends AsyncTask<Item, Integer, Integer>
 
 	public interface XMLRPCDeleterCallback
 	{
+		public void itemDelete(int remotePostId);
 		public void itemDeleted(int itemId);
 		public void deletionFailed(int reason);
 	}
@@ -103,6 +104,9 @@ public class XMLRPCDeleter extends AsyncTask<Item, Integer, Integer>
 						Log.v(LOGTAG, "Logging into XMLRPC Interface: " + xmlRPCUsername + '@' + socialReporter.xmlrpcEndpoint);
 					Wordpress wordpress = new Wordpress(xmlRPCUsername, xmlRPCPassword, socialReporter.xmlrpcEndpoint);
 					boolean success = wordpress.deletePost(item.getRemotePostId());
+					if (success && itemDeletedCallback != null) {
+						itemDeletedCallback.itemDelete(item.getRemotePostId());
+					}
 					return success ? 1 : 0;
 				} else {
 					if (LOGGING)
