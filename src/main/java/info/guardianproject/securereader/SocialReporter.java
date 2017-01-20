@@ -162,9 +162,6 @@ public class SocialReporter
 			XMLRPCPublisher publisher = new XMLRPCPublisher(this);
 			publisher.setXMLRPCPublisherCallback(callback);
 			publisher.execute(story);
-	
-			story.setFeedId(DatabaseHelper.POSTS_FEED_ID);
-			socialReader.databaseAdapter.addOrUpdateItem(story, -1);
 		} else {
 			if (LOGGING)
 				Log.e(LOGTAG,"Database not ready");

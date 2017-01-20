@@ -40,6 +40,7 @@ public class XMLRPCPublisher extends AsyncTask<Item, Integer, Integer>
 	public static final int FAILURE_UNKNOWN = -4;
 	
 	SocialReporter socialReporter;
+	Item item;
 
 	XMLRPCPublisherCallback itemPublishedCallback;
 
@@ -63,7 +64,6 @@ public class XMLRPCPublisher extends AsyncTask<Item, Integer, Integer>
 	@Override
 	protected Integer doInBackground(Item... params)
 	{
-		Item item = new Item();
 		if (params.length == 0)
 		{
 			if (LOGGING)
@@ -125,8 +125,7 @@ public class XMLRPCPublisher extends AsyncTask<Item, Integer, Integer>
 				
 				if (xmlRPCUsername != null && xmlRPCPassword != null) 
 				{
-	
-					if (LOGGING) 
+					if (LOGGING)
 						Log.v(LOGTAG, "Logging into XMLRPC Interface: " + xmlRPCUsername + '@' + socialReporter.xmlrpcEndpoint);
 					Wordpress wordpress = new Wordpress(xmlRPCUsername, xmlRPCPassword, socialReporter.xmlrpcEndpoint);
 
@@ -267,6 +266,8 @@ public class XMLRPCPublisher extends AsyncTask<Item, Integer, Integer>
 		if (itemPublishedCallback != null)
 		{
 			if (status >= 0) {
+				item.setFeedId(DatabaseHelper.POSTS_FEED_ID);
+				socialReporter.saveDraft(item);
 				itemPublishedCallback.itemPublished(status);
 			} else {
 				itemPublishedCallback.publishingFailed(status);
