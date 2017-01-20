@@ -21,11 +21,16 @@ import info.guardianproject.netcipher.client.StrongHttpsClient;
 import java.io.BufferedInputStream;
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -40,7 +45,9 @@ import android.content.Context;
 import android.util.Log;
 
 import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.TrustManagerFactory;
 
 import ch.boye.httpclientandroidlib.Header;
 import ch.boye.httpclientandroidlib.HttpHost;
@@ -50,6 +57,7 @@ import ch.boye.httpclientandroidlib.entity.AbstractHttpEntity;
 import ch.boye.httpclientandroidlib.entity.StringEntity;
 import ch.boye.httpclientandroidlib.message.BasicHeader;
 import info.guardianproject.securereader.NoSSLv3SocketFactory;
+import info.guardianproject.securereader.R;
 import info.guardianproject.securereader.SocialReader;
 
 /**
@@ -462,7 +470,7 @@ public class XmlRpcClient extends XmlRpcParser implements XmlRpcInvocationHandle
             }
             catch ( Exception e )
             {
-                e.printStackTrace();
+                Log.e("XMLRPC","handleResponse error: " + e.getMessage(),e);
                 throw new XmlRpcException(
                         XmlRpcMessages.getString( "XmlRpcClient.ParseError" ), e );
 
@@ -594,13 +602,17 @@ public class XmlRpcClient extends XmlRpcParser implements XmlRpcInvocationHandle
         String[] pins                 = new String[] {"o+cLJOudSFO5j/QospKIAvPiMp++/OVDZm4PbLSGQus="};
         connection = PinningHelper.getPinnedHttpsURLConnection(mContext, pins, url);
 
-		SSLSocketFactory NoSSLv3Factory = new NoSSLv3SocketFactory(StrongHttpsClient.getSSLSocketFactory(mContext));
+		SSLSocketFactory NoSSLv3Factory = new NoSSLv3SocketFactory(getSSLSocketFactory(mContext));
 		connection.setSSLSocketFactory(NoSSLv3Factory);
 
 		connection.setDoInput( true );
 		connection.setDoOutput( true );
-		connection.setRequestMethod( "POST" );
+        connection.setUseCaches(false);
 
+        connection.setRequestMethod( "POST" );
+
+        connection.setRequestProperty("Connection", "Keep-Alive");
+        connection.setRequestProperty("Cache-Control", "no-cache");
 		connection.setRequestProperty(
 				"Content-Type", "text/xml; charset=" +
 						XmlRpcMessages.getString( "XmlRpcClient.Encoding" ) );
@@ -642,6 +654,37 @@ public class XmlRpcClient extends XmlRpcParser implements XmlRpcInvocationHandle
 		mProxyHost = proxyHost;
 		mProxyPort = proxyPort;
 	}
+
+    public static SSLSocketFactory getSSLSocketFactory (Context context)
+    {
+        try {
+            KeyStore keyStore = loadKeyStore(context);
+            TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            trustManagerFactory.init(keyStore);
+
+            SSLContext ctx = SSLContext.getInstance("TLSv1");
+            ctx.init(null, trustManagerFactory.getTrustManagers(), null);
+
+            return ctx.getSocketFactory();
+        } catch (Exception e) {
+            throw new AssertionError(e);
+        }
+    }
+
+    private static KeyStore loadKeyStore (Context context) throws KeyStoreException, NoSuchAlgorithmException, CertificateException, IOException
+    {
+
+        KeyStore trustStore = KeyStore.getInstance(TRUSTSTORE_TYPE);
+        // load our bundled cacerts from raw assets
+        InputStream in = context.getResources().openRawResource(R.raw.debiancacerts);
+        trustStore.load(in, TRUSTSTORE_PASSWORD.toCharArray());
+
+        return trustStore;
+    }
+
+
+    private final static String TRUSTSTORE_TYPE = "BKS";
+    private final static String TRUSTSTORE_PASSWORD = "changeit";
 
 	/** The server URL. */
 	private final URL url;
