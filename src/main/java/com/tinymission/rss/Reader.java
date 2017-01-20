@@ -1,6 +1,7 @@
 package com.tinymission.rss;
 
 import ch.boye.httpclientandroidlib.Header;
+import ch.boye.httpclientandroidlib.impl.client.DefaultHttpClient;
 import info.guardianproject.netcipher.client.StrongHttpsClient;
 import info.guardianproject.securereader.SocialReader;
 
@@ -36,7 +37,7 @@ public class Reader
 {
 
 	public final static String LOGTAG = "TinyRSS Reader";
-	public final static boolean LOGGING = false;
+	public final static boolean LOGGING = true;
 
 	private Feed feed;
 
@@ -209,15 +210,16 @@ public class Reader
 
 			} else {
 
-				StrongHttpsClient httpClient = new StrongHttpsClient(socialReader.applicationContext);
+				//StrongHttpsClient httpClient = new StrongHttpsClient(socialReader.applicationContext);
+				DefaultHttpClient httpClient = new DefaultHttpClient();
 
 				if (socialReader.relaxedHTTPS) {
-					httpClient.enableSSLCompatibilityMode();
+				//	httpClient.enableSSLCompatibilityMode();
 				}
 
 				if (socialReader.useProxy())
 				{
-				    httpClient.useProxy(true, socialReader.getProxyType(), socialReader.getProxyHost(), socialReader.getProxyPort());
+				  //  httpClient.useProxy(true, socialReader.getProxyType(), socialReader.getProxyHost(), socialReader.getProxyPort());
 					//httpClient.useProxy(true, "HTTP", "127.0.0.1", 8080);
 
 				    if (LOGGING)

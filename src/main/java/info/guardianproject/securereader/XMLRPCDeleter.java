@@ -69,6 +69,12 @@ public class XMLRPCDeleter extends AsyncTask<Item, Integer, Integer>
 		{
 			item = params[0];
 
+			if (item.getRemotePostId() == -1)
+			{
+				//there is no remote post, so let's just say success!
+				return 1;
+			}
+
 			try
 			{
 				XmlRpcClient.setContext(socialReporter.applicationContext);		

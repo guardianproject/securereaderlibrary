@@ -308,7 +308,8 @@ public class CommentReader
 			}
 			else if (isEntityTag(qName))
 			{
-				_entityStack.pop();
+				if (!_entityStack.isEmpty())
+					_entityStack.pop();
 			}
 		}
 

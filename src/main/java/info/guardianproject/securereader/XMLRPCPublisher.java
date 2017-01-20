@@ -107,7 +107,9 @@ public class XMLRPCPublisher extends AsyncTask<Item, Integer, Integer>
 					// acxu.createUser
 					ArrayList<String> arguments = new ArrayList<String>();
 					arguments.add(nickname);
-					XmlRpcClient xpc = new XmlRpcClient(new URL(socialReporter.xmlrpcEndpoint));
+
+					boolean doStreaming = true;
+					XmlRpcClient xpc = new XmlRpcClient(new URL(socialReporter.xmlrpcEndpoint),doStreaming);
 					String result = (String) xpc.invoke("acxu.createUser", arguments);
 					if (LOGGING) 
 						Log.v(LOGTAG,"From wordpress: " + result);

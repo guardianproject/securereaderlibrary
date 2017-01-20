@@ -160,7 +160,7 @@ public class SyncService extends Service {
     		} else if (type == TYPE_MEDIA) {
     			startMediaDownloader();
     		} else if (type == TYPE_COMMENTS) {
-    			startCommentsFeedFetcher();
+    		//	startCommentsFeedFetcher();
     		}
     	}
 
@@ -171,7 +171,7 @@ public class SyncService extends Service {
 				} else if (type == TYPE_MEDIA) {
 					stopMediaDownloader();
 				} else if (type == TYPE_COMMENTS) {
-					stopCommentsFeedFetcher();
+				//	stopCommentsFeedFetcher();
 				}
 			} catch (Exception ignored) {
 			}

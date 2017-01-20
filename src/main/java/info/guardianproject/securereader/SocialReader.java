@@ -126,7 +126,8 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	public final static String TOR_PROXY_TYPE = "SOCKS";
 	public final static String TOR_PROXY_HOST = "127.0.0.1";
 	public int TOR_PROXY_PORT = 9050; // default for SOCKS Orbot/Tor
-	
+	public int TOR_PROXY_PORT_HTTP = 8118; // default for SOCKS Orbot/Tor
+
 	public final static String PSIPHON_PROXY_HOST = "127.0.0.1";
 	public final static String PSIPHON_PROXY_TYPE = "HTTP";
 	public int PSIPHON_PROXY_PORT = -1;
