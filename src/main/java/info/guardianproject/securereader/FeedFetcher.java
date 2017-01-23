@@ -13,7 +13,7 @@ import com.tinymission.rss.Reader;
 public class FeedFetcher extends AsyncTask<Feed, Integer, Feed>
 {
 	public final static String LOGTAG = "FeedFetcher";
-	public final static boolean LOGGING = true;
+	public final static boolean LOGGING = false;
 
 	SocialReader socialReader;
 

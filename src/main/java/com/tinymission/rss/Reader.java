@@ -37,7 +37,7 @@ public class Reader
 {
 
 	public final static String LOGTAG = "TinyRSS Reader";
-	public final static boolean LOGGING = true;
+	public final static boolean LOGGING = false;
 
 	private Feed feed;
 

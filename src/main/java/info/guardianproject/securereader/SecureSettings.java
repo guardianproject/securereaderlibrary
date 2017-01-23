@@ -6,7 +6,7 @@ import android.util.Log;
 public class SecureSettings {
 	
 	public static final String LOGTAG = "SecureSettings";
-	public static final boolean LOGGING = true;
+	public static final boolean LOGGING = false;
 	
 	public static final String KEY_XMLRPC_USERNAME = "xmlrpc_username";
 	public static final String KEY_XMLRPC_PASSWORD = "xmlrpc_password";	
