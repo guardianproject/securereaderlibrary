@@ -1611,12 +1611,11 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 
 		
 		if (!done) {
-			if (Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED))
+			if (Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED) && (filesDir = applicationContext.getExternalFilesDir(null)) != null)
 			{
-				if (LOGGING) 
+				if (LOGGING)
 					Log.v(LOGTAG,"sdcard mounted");
-				
-				filesDir = applicationContext.getExternalFilesDir(null);
+
 				if (!filesDir.exists())
 				{
 					if (LOGGING) 
