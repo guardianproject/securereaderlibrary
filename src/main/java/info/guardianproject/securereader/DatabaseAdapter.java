@@ -396,43 +396,48 @@ public class DatabaseAdapter
 
 	public int updateFeed(Feed feed)
 	{
-		ContentValues values = new ContentValues();
-		values.put(DatabaseHelper.FEEDS_TABLE_TITLE, feed.getTitle());
-		values.put(DatabaseHelper.FEEDS_TABLE_FEED_URL, feed.getFeedURL());
-		values.put(DatabaseHelper.FEEDS_TABLE_LANGUAGE, feed.getLanguage());
-		values.put(DatabaseHelper.FEEDS_TABLE_DESCRIPTION, feed.getDescription());
-		values.put(DatabaseHelper.FEEDS_TABLE_LINK, feed.getLink());
-		values.put(DatabaseHelper.FEEDS_TABLE_STATUS, feed.getStatus());
-		
-		if (feed.isSubscribed())
-		{
-			values.put(DatabaseHelper.FEEDS_TABLE_SUBSCRIBED, 1);
-		}
-		else
-		{
-			values.put(DatabaseHelper.FEEDS_TABLE_SUBSCRIBED, 0);
-		}
-
-		if (feed.getNetworkPullDate() != null)
-		{
-			values.put(DatabaseHelper.FEEDS_TABLE_NETWORK_PULL_DATE, dateFormat.format(feed.getNetworkPullDate()));
-		}
-
-		if (feed.getLastBuildDate() != null)
-		{
-			values.put(DatabaseHelper.FEEDS_TABLE_LAST_BUILD_DATE, dateFormat.format(feed.getLastBuildDate()));
-		}
-
-		if (feed.getPubDate() != null)
-		{
-			values.put(DatabaseHelper.FEEDS_TABLE_PUBLISH_DATE, dateFormat.format(feed.getPubDate()));
-		}
-
 		int returnValue = -1;
-		if (databaseReady())
-			returnValue = db
-				.update(DatabaseHelper.FEEDS_TABLE, values, DatabaseHelper.FEEDS_TABLE_COLUMN_ID + "=?", new String[] { String.valueOf(feed.getDatabaseId()) });
+		try {
+			ContentValues values = new ContentValues();
+			values.put(DatabaseHelper.FEEDS_TABLE_TITLE, feed.getTitle());
+			values.put(DatabaseHelper.FEEDS_TABLE_FEED_URL, feed.getFeedURL());
+			values.put(DatabaseHelper.FEEDS_TABLE_LANGUAGE, feed.getLanguage());
+			values.put(DatabaseHelper.FEEDS_TABLE_DESCRIPTION, feed.getDescription());
+			values.put(DatabaseHelper.FEEDS_TABLE_LINK, feed.getLink());
+			values.put(DatabaseHelper.FEEDS_TABLE_STATUS, feed.getStatus());
 
+			if (feed.isSubscribed()) {
+				values.put(DatabaseHelper.FEEDS_TABLE_SUBSCRIBED, 1);
+			} else {
+				values.put(DatabaseHelper.FEEDS_TABLE_SUBSCRIBED, 0);
+			}
+
+			if (feed.getNetworkPullDate() != null) {
+				values.put(DatabaseHelper.FEEDS_TABLE_NETWORK_PULL_DATE, dateFormat.format(feed.getNetworkPullDate()));
+			}
+
+			if (feed.getLastBuildDate() != null) {
+				values.put(DatabaseHelper.FEEDS_TABLE_LAST_BUILD_DATE, dateFormat.format(feed.getLastBuildDate()));
+			}
+
+			if (feed.getPubDate() != null) {
+				values.put(DatabaseHelper.FEEDS_TABLE_PUBLISH_DATE, dateFormat.format(feed.getPubDate()));
+			}
+
+			if (databaseReady())
+				returnValue = db
+						.update(DatabaseHelper.FEEDS_TABLE, values, DatabaseHelper.FEEDS_TABLE_COLUMN_ID + "=?", new String[]{String.valueOf(feed.getDatabaseId())});
+		}
+		catch (SQLException e)
+		{
+			if (LOGGING)
+				e.printStackTrace();
+		}
+		catch(IllegalStateException e)
+		{
+			if (LOGGING)
+				e.printStackTrace();
+		}
 		return returnValue;
 	}
 	
