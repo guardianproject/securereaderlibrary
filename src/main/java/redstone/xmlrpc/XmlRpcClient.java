@@ -81,12 +81,14 @@ public class XmlRpcClient extends XmlRpcParser implements XmlRpcInvocationHandle
 	 */
 
 	/**
-	 * @see #XmlRpcClient(URL url,boolean)
+	 * @see #XmlRpcClient(URL url,boolean, String[])
 	 */
 
-	public XmlRpcClient(URL url, boolean streamMessages)
+	public XmlRpcClient(URL url, boolean streamMessages, String[] pinnedCert)
 	{
 		this.url = url;
+
+        this.pinnedCert = pinnedCert;
 
         this.streamMessages = streamMessages;
 
@@ -584,14 +586,22 @@ public class XmlRpcClient extends XmlRpcParser implements XmlRpcInvocationHandle
 
 	private void openConnection() throws IOException
 	{
-		connection = (HttpsURLConnection) url.openConnection();
-		/**
-        String[] pins                 = new String[] {"o+cLJOudSFO5j/QospKIAvPiMp++/OVDZm4PbLSGQus="};
-        connection = PinningHelper.getPinnedHttpsURLConnection(mContext, pins, url);
+
+        if (pinnedCert != null)
+		    connection = PinningHelper.getPinnedHttpsURLConnection(mContext, pinnedCert, url);
+        else
+            connection = (HttpsURLConnection) url.openConnection();
 
 		SSLSocketFactory NoSSLv3Factory = new NoSSLv3SocketFactory(getSSLSocketFactory(mContext));
 		connection.setSSLSocketFactory(NoSSLv3Factory);
-		 **/
+
+        /**
+        if (mUseProxy)
+        {
+            httpClient.useProxy(true, mProxyType, mProxyHost, mProxyPort);
+            Log.v(LOGTAG, "Using Proxy in XmlRpcClient");
+            //httpClient.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, new HttpHost(mProxyHost, mProxyPort));
+        }**/
 
 		connection.setDoInput( true );
 		connection.setDoOutput( true );
@@ -619,13 +629,7 @@ public class XmlRpcClient extends XmlRpcParser implements XmlRpcInvocationHandle
 		}
 
 
-/**
-		if (mUseProxy)
-		{
-			httpClient.useProxy(true, mProxyType, mProxyHost, mProxyPort);
-			Log.v(LOGTAG, "Using Proxy in XmlRpcClient");
-			//httpClient.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, new HttpHost(mProxyHost, mProxyPort));
-		}**/
+
 
 
 	}
@@ -644,7 +648,6 @@ public class XmlRpcClient extends XmlRpcParser implements XmlRpcInvocationHandle
 
 	}
 
-	/**
     public static SSLSocketFactory getSSLSocketFactory (Context context)
     {
         try {
@@ -672,15 +675,17 @@ public class XmlRpcClient extends XmlRpcParser implements XmlRpcInvocationHandle
         return trustStore;
     }
 
-
     private final static String TRUSTSTORE_TYPE = "BKS";
     private final static String TRUSTSTORE_PASSWORD = "changeit";
-		**/
 
 	/** The server URL. */
 	private final URL url;
 
-	/** HTTP Resposne **/
+    /*** Pinned Cert **/
+    private String[] pinnedCert;
+
+
+    /** HTTP Resposne **/
 	private HttpResponse hResp = null; // latest response
 
 	/** The Android App Context **/

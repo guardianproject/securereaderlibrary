@@ -206,7 +206,7 @@ public class XmlRpcProxy implements InvocationHandler
         URL url,
         String objectName )
     {
-        client = new XmlRpcClient( url , true);
+        client = new XmlRpcClient( url , true, null);
         this.objectName = objectName;
     }
 

@@ -2,6 +2,7 @@ package info.guardianproject.securereader;
 
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.text.TextUtils;
 import android.util.Log;
 
 import com.tinymission.rss.Comment;
@@ -35,6 +36,7 @@ public class SocialReporter
 	
 	public String xmlrpcEndpoint;
 
+	public String[] xmlrpcEndpointPinnedCert = null;
 
 	public SocialReporter(SocialReader _socialReader)
 	{
@@ -42,6 +44,13 @@ public class SocialReporter
 		applicationContext = socialReader.applicationContext;
 		
 		xmlrpcEndpoint = applicationContext.getResources().getString(R.string.xmlrpc_endpoint);
+
+		String certPin = applicationContext.getResources().getString(R.string.xmlrpc_endpoint_cert_pin);
+
+		if (!TextUtils.isEmpty(certPin)) {
+			xmlrpcEndpointPinnedCert = new String[1];
+			xmlrpcEndpointPinnedCert[0] = applicationContext.getResources().getString(R.string.xmlrpc_endpoint_cert_pin);
+		}
 	}
 
 	public boolean useProxy() 

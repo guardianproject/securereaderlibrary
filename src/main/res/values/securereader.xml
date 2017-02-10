@@ -44,7 +44,8 @@
 	
 	<!-- XMLRPC_ENDPOINT -->
 	<string name="xmlrpc_endpoint">https://securereader.guardianproject.info/xmlrpc.php</string>
-	
+	<string name="xmlrpc_endpoint_cert_pin"></string>
+
 	<!-- Default values that should be referenced in Settings.java -->
 	<bool name="require_proxy_default">true</bool>
 	<string name="article_expiration_default">Never</string>

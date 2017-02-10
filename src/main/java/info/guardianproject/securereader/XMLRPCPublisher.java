@@ -109,7 +109,7 @@ public class XMLRPCPublisher extends AsyncTask<Item, Integer, Integer>
 					arguments.add(nickname);
 
 					boolean doStreaming = true;
-					XmlRpcClient xpc = new XmlRpcClient(new URL(socialReporter.xmlrpcEndpoint),doStreaming);
+					XmlRpcClient xpc = new XmlRpcClient(new URL(socialReporter.xmlrpcEndpoint),doStreaming,socialReporter.xmlrpcEndpointPinnedCert);
 					String result = (String) xpc.invoke("acxu.createUser", arguments);
 					if (LOGGING) 
 						Log.v(LOGTAG,"From wordpress: " + result);
