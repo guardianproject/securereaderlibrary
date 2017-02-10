@@ -154,78 +154,51 @@ public class CommentReader
 			Handler handler = new Handler();
 			xr.setContentHandler(handler);
 
-			StrongHttpClientBuilder builder = StrongHttpClientBuilder.forMaxSecurity(socialReader.applicationContext);
-			if (socialReader.useProxy())
+			HttpClient httpClient = socialReader.getHttpClient();
+
+			if (item.getCommentsUrl() != null && !(item.getCommentsUrl().isEmpty()))
 			{
-				builder.withSocksProxy();
-				//				    httpClient.useProxy(true, socialReader.getProxyType(), socialReader.getProxyHost(), socialReader.getProxyPort());
+				try {
+					HttpGet httpGet = new HttpGet(item.getCommentsUrl());
+					httpGet.setHeader("User-Agent", SocialReader.USERAGENT);
 
+					HttpResponse response = httpClient.execute(httpGet);
+
+					if (response.getStatusLine().getStatusCode() == 200) {
+						if (LOGGING)
+							Log.v(LOGTAG, "Response Code is good");
+
+						is = response.getEntity().getContent();
+						xr.parse(new InputSource(is));
+
+						is.close();
+
+						Date currentDate = new Date();
+						item.setStatus(Feed.STATUS_LAST_SYNC_GOOD);
+
+					} else {
+						Log.v(LOGTAG, "Response Code: " + response.getStatusLine().getStatusCode());
+						if (response.getStatusLine().getStatusCode() == 404) {
+							item.setStatus(Feed.STATUS_LAST_SYNC_FAILED_404);
+						} else {
+							item.setStatus(Feed.STATUS_LAST_SYNC_FAILED_UNKNOWN);
+						}
+					}
+
+				}
+				catch (Exception ioe)
+				{
+					if (LOGGING)
+						Log.e("SAX XML", "sax parse io error", ioe);
+					item.setStatus(Feed.STATUS_LAST_SYNC_PARSE_ERROR);
+
+				}
+			} else {
+				if (LOGGING)
+					Log.e(LOGTAG, "Failed to sync feed, bad URL " + item.getCommentsUrl());
+
+				item.setStatus(Feed.STATUS_LAST_SYNC_FAILED_BAD_URL);
 			}
-
-			builder.build(new StrongBuilder.Callback<HttpClient>() {
-				@Override
-				public void onConnected(HttpClient httpClient) {
-                    if (item.getCommentsUrl() != null && !(item.getCommentsUrl().isEmpty()))
-                    {
-                        try {
-                            HttpGet httpGet = new HttpGet(item.getCommentsUrl());
-                            httpGet.setHeader("User-Agent", SocialReader.USERAGENT);
-
-                            HttpResponse response = httpClient.execute(httpGet);
-
-                            if (response.getStatusLine().getStatusCode() == 200) {
-                                if (LOGGING)
-                                    Log.v(LOGTAG, "Response Code is good");
-
-                                is = response.getEntity().getContent();
-                                xr.parse(new InputSource(is));
-
-                                is.close();
-
-                                Date currentDate = new Date();
-                                item.setStatus(Feed.STATUS_LAST_SYNC_GOOD);
-
-                            } else {
-                                Log.v(LOGTAG, "Response Code: " + response.getStatusLine().getStatusCode());
-                                if (response.getStatusLine().getStatusCode() == 404) {
-                                    item.setStatus(Feed.STATUS_LAST_SYNC_FAILED_404);
-                                } else {
-                                    item.setStatus(Feed.STATUS_LAST_SYNC_FAILED_UNKNOWN);
-                                }
-                            }
-
-                        }
-                        catch (Exception ioe)
-                        {
-                            if (LOGGING)
-                                Log.e("SAX XML", "sax parse io error", ioe);
-                            item.setStatus(Feed.STATUS_LAST_SYNC_PARSE_ERROR);
-
-                        }
-                    } else {
-                        if (LOGGING)
-                            Log.e(LOGTAG, "Failed to sync feed, bad URL " + item.getCommentsUrl());
-
-                        item.setStatus(Feed.STATUS_LAST_SYNC_FAILED_BAD_URL);
-                    }
-				}
-
-				@Override
-				public void onConnectionException(Exception e) {
-
-				}
-
-				@Override
-				public void onTimeout() {
-
-				}
-
-				@Override
-				public void onInvalid() {
-
-				}
-			});
-
 
 	
 

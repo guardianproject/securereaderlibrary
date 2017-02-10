@@ -56,53 +56,8 @@ public class NonVFSMediaDownloader extends AsyncTask<MediaContent, Integer, File
 		if (params.length == 0)
 			return null;
 
-		final MediaContent mediaContent = params[0];
-
-		try {
-			StrongHttpClientBuilder builder = StrongHttpClientBuilder.forMaxSecurity(socialReader.applicationContext);
-			if (socialReader.useProxy()) {
-
-                if (socialReader.getProxyType().equalsIgnoreCase("socks"))
-				    builder.withSocksProxy();
-                else
-                    builder.withHttpProxy();
-
-				//				    httpClient.useProxy(true, socialReader.getProxyType(), socialReader.getProxyHost(), socialReader.getProxyPort());
-
-			}
-
-			builder.build(new StrongBuilder.Callback<HttpClient>() {
-				@Override
-				public void onConnected(HttpClient httpClient) {
-
-
-					doGet (httpClient, mediaContent);
-				}
-
-				@Override
-				public void onConnectionException(Exception e) {
-
-				}
-
-				@Override
-				public void onTimeout() {
-
-				}
-
-				@Override
-				public void onInvalid() {
-
-				}
-			});
-		}
-		catch (Exception e)
-		{
-			Log.e(LOGTAG,"error fetching feed",e);
-		}
-
-
-
-		return savedFile;
+		MediaContent mediaContent = params[0];
+		return doGet (socialReader.getHttpClient(), mediaContent);
 	}
 
 	@Override

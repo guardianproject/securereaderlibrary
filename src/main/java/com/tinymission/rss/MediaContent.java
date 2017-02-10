@@ -27,7 +27,6 @@ public class MediaContent extends FeedEntity implements Serializable
 	 * public int getResId() { return mResId; }
 	 */
 	public static final int DEFAULT_DATABASE_ID = -1;
-
 	
 	private long itemDatabaseId;
 	private long databaseId = DEFAULT_DATABASE_ID;
