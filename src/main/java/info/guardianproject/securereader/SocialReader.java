@@ -286,7 +286,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 			        }
 			    }, new IntentFilter(Constants.INTENT_NEW_SECRETS));
 
-		initHttpClient();
+
 	}
 		
     private static SocialReader socialReader = null;
@@ -302,20 +302,19 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
         return httpClient;
     }
 
-	private void initHttpClient ()
+	private void initHttpClient (Context context)
 	{
+		OrbotHelper.get(context).init();
 
 		try {
-			StrongHttpClientBuilder builder = StrongHttpClientBuilder.forMaxSecurity(socialReader.applicationContext);
-			if (socialReader.useProxy()) {
+			StrongHttpClientBuilder builder = StrongHttpClientBuilder.forMaxSecurity(context);
 
+			if (socialReader.useProxy()) {
 				if (socialReader.getProxyType().equalsIgnoreCase("socks"))
 					builder.withSocksProxy();
 				else
 					builder.withHttpProxy();
-
 				//				    httpClient.useProxy(true, socialReader.getProxyType(), socialReader.getProxyHost(), socialReader.getProxyPort());
-
 			}
 
 			builder.build(new StrongBuilder.Callback<HttpClient>() {
@@ -327,17 +326,17 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 
 				@Override
 				public void onConnectionException(Exception e) {
-
+					Log.w(LOGTAG,"Couldn't connet httpclient",e);
 				}
 
 				@Override
 				public void onTimeout() {
-
+					Log.w(LOGTAG,"build httpclient timeout");
 				}
 
 				@Override
 				public void onInvalid() {
-
+					Log.w(LOGTAG,"build httpclient invalid");
 				}
 			});
 		}
@@ -503,6 +502,8 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
             initialized = true;
             if (lockListener != null)
             	lockListener.onUnlocked();
+			
+			initHttpClient(applicationContext);
 
 	    } else {
 	    	if (LOGGING)

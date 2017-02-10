@@ -211,19 +211,6 @@ public class Reader
 
 				HttpClient httpClient = socialReader.getHttpClient();
 
-				if (socialReader.relaxedHTTPS) {
-				//	httpClient.enableSSLCompatibilityMode();
-				}
-
-				if (socialReader.useProxy())
-				{
-				  //  httpClient.useProxy(true, socialReader.getProxyType(), socialReader.getProxyHost(), socialReader.getProxyPort());
-					//httpClient.useProxy(true, "HTTP", "127.0.0.1", 8080);
-
-				    if (LOGGING)
-				    	Log.v(LOGTAG,"Using Proxy: " + socialReader.getProxyType() + socialReader.getProxyHost() + socialReader.getProxyPort());
-				}
-
 				if (feedUrl != null && !(feedUrl.isEmpty()))
 				{
 					HttpGet httpGet = new HttpGet(feedUrl);
