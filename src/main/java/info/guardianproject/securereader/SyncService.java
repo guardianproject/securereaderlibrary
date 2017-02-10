@@ -160,7 +160,7 @@ public class SyncService extends Service {
     		} else if (type == TYPE_MEDIA) {
     			startMediaDownloader();
     		} else if (type == TYPE_COMMENTS) {
-    		//	startCommentsFeedFetcher();
+    			startCommentsFeedFetcher();
     		}
     	}
 
