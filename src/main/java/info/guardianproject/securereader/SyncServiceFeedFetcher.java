@@ -24,6 +24,8 @@ public class SyncServiceFeedFetcher implements Runnable
 	
 	Messenger messenger;
 	Handler runHandler;
+
+	Reader reader;
 	
 	public interface SyncServiceFeedFetchedCallback
 	{
@@ -45,11 +47,14 @@ public class SyncServiceFeedFetcher implements Runnable
 		
 		messenger = new Messenger(runHandler);
 	}
-	
+
+	public void stop() {
+		if (reader != null) reader.stop();
+	}
 	
 	@Override
 	public void run() {		
-		Reader reader = new Reader(SocialReader.getInstance(syncService.getApplicationContext()), syncTask.feed);
+		reader = new Reader(SocialReader.getInstance(syncService.getApplicationContext()), syncTask.feed);
 		syncTask.feed = reader.fetchFeed();
 
 		SocialReader.getInstance(syncService.getApplicationContext()).setFeedAndItemData(syncTask.feed);

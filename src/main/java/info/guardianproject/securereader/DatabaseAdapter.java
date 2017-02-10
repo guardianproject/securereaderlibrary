@@ -396,43 +396,48 @@ public class DatabaseAdapter
 
 	public int updateFeed(Feed feed)
 	{
-		ContentValues values = new ContentValues();
-		values.put(DatabaseHelper.FEEDS_TABLE_TITLE, feed.getTitle());
-		values.put(DatabaseHelper.FEEDS_TABLE_FEED_URL, feed.getFeedURL());
-		values.put(DatabaseHelper.FEEDS_TABLE_LANGUAGE, feed.getLanguage());
-		values.put(DatabaseHelper.FEEDS_TABLE_DESCRIPTION, feed.getDescription());
-		values.put(DatabaseHelper.FEEDS_TABLE_LINK, feed.getLink());
-		values.put(DatabaseHelper.FEEDS_TABLE_STATUS, feed.getStatus());
-		
-		if (feed.isSubscribed())
-		{
-			values.put(DatabaseHelper.FEEDS_TABLE_SUBSCRIBED, 1);
-		}
-		else
-		{
-			values.put(DatabaseHelper.FEEDS_TABLE_SUBSCRIBED, 0);
-		}
-
-		if (feed.getNetworkPullDate() != null)
-		{
-			values.put(DatabaseHelper.FEEDS_TABLE_NETWORK_PULL_DATE, dateFormat.format(feed.getNetworkPullDate()));
-		}
-
-		if (feed.getLastBuildDate() != null)
-		{
-			values.put(DatabaseHelper.FEEDS_TABLE_LAST_BUILD_DATE, dateFormat.format(feed.getLastBuildDate()));
-		}
-
-		if (feed.getPubDate() != null)
-		{
-			values.put(DatabaseHelper.FEEDS_TABLE_PUBLISH_DATE, dateFormat.format(feed.getPubDate()));
-		}
-
 		int returnValue = -1;
-		if (databaseReady())
-			returnValue = db
-				.update(DatabaseHelper.FEEDS_TABLE, values, DatabaseHelper.FEEDS_TABLE_COLUMN_ID + "=?", new String[] { String.valueOf(feed.getDatabaseId()) });
+		try {
+			ContentValues values = new ContentValues();
+			values.put(DatabaseHelper.FEEDS_TABLE_TITLE, feed.getTitle());
+			values.put(DatabaseHelper.FEEDS_TABLE_FEED_URL, feed.getFeedURL());
+			values.put(DatabaseHelper.FEEDS_TABLE_LANGUAGE, feed.getLanguage());
+			values.put(DatabaseHelper.FEEDS_TABLE_DESCRIPTION, feed.getDescription());
+			values.put(DatabaseHelper.FEEDS_TABLE_LINK, feed.getLink());
+			values.put(DatabaseHelper.FEEDS_TABLE_STATUS, feed.getStatus());
 
+			if (feed.isSubscribed()) {
+				values.put(DatabaseHelper.FEEDS_TABLE_SUBSCRIBED, 1);
+			} else {
+				values.put(DatabaseHelper.FEEDS_TABLE_SUBSCRIBED, 0);
+			}
+
+			if (feed.getNetworkPullDate() != null) {
+				values.put(DatabaseHelper.FEEDS_TABLE_NETWORK_PULL_DATE, dateFormat.format(feed.getNetworkPullDate()));
+			}
+
+			if (feed.getLastBuildDate() != null) {
+				values.put(DatabaseHelper.FEEDS_TABLE_LAST_BUILD_DATE, dateFormat.format(feed.getLastBuildDate()));
+			}
+
+			if (feed.getPubDate() != null) {
+				values.put(DatabaseHelper.FEEDS_TABLE_PUBLISH_DATE, dateFormat.format(feed.getPubDate()));
+			}
+
+			if (databaseReady())
+				returnValue = db
+						.update(DatabaseHelper.FEEDS_TABLE, values, DatabaseHelper.FEEDS_TABLE_COLUMN_ID + "=?", new String[]{String.valueOf(feed.getDatabaseId())});
+		}
+		catch (SQLException e)
+		{
+			if (LOGGING)
+				e.printStackTrace();
+		}
+		catch(IllegalStateException e)
+		{
+			if (LOGGING)
+				e.printStackTrace();
+		}
 		return returnValue;
 	}
 	
@@ -2217,6 +2222,10 @@ public class DatabaseAdapter
 	public long addOrUpdateItemMedia(Item item, MediaContent itemMedia)
 	{
 		long returnValue = -1;
+		// Check that we have a valid url
+		if (itemMedia == null || itemMedia.getUrl() == null) {
+			return returnValue; // Abort
+		}
 		if (itemMedia.getDatabaseId() == MediaContent.DEFAULT_DATABASE_ID)
 		{
 			String query = "select " + DatabaseHelper.ITEM_MEDIA_TABLE_COLUMN_ID + ", " + DatabaseHelper.ITEM_MEDIA_URL + ", "
@@ -2350,7 +2359,7 @@ public class DatabaseAdapter
 				
 					ContentValues values = new ContentValues();
 					values.put(DatabaseHelper.COMMENTS_TABLE_ITEM_ID, item.getDatabaseId());
-					values.put(DatabaseHelper.COMMENTS_TABLE_TITLE, item.getTitle());
+					values.put(DatabaseHelper.COMMENTS_TABLE_TITLE, itemComment.getTitle());
 					values.put(DatabaseHelper.COMMENTS_TABLE_LINK, itemComment.getLink());
 					values.put(DatabaseHelper.COMMENTS_TABLE_AUTHOR, itemComment.getAuthor());
 					values.put(DatabaseHelper.COMMENTS_TABLE_DESCRIPTION, itemComment.getDescription());
@@ -2418,7 +2427,7 @@ public class DatabaseAdapter
 		
 		ContentValues values = new ContentValues();
 		values.put(DatabaseHelper.COMMENTS_TABLE_ITEM_ID, item.getDatabaseId());
-		values.put(DatabaseHelper.COMMENTS_TABLE_TITLE, item.getTitle());
+		values.put(DatabaseHelper.COMMENTS_TABLE_TITLE, itemComment.getTitle());
 		values.put(DatabaseHelper.COMMENTS_TABLE_LINK, itemComment.getLink());
 		values.put(DatabaseHelper.COMMENTS_TABLE_AUTHOR, itemComment.getAuthor());
 		values.put(DatabaseHelper.COMMENTS_TABLE_DESCRIPTION, itemComment.getDescription());

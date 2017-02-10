@@ -1,14 +1,12 @@
 package info.guardianproject.securereader;
 
-import info.guardianproject.iocipher.File;
-import info.guardianproject.iocipher.FileInputStream;
-import info.guardianproject.netcipher.client.StrongHttpsClient;
-
 import java.io.BufferedInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+
+import info.guardianproject.iocipher.*;
 
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
@@ -20,8 +18,10 @@ import org.xml.sax.helpers.DefaultHandler;
 
 import android.os.AsyncTask;
 import android.util.Log;
-import ch.boye.httpclientandroidlib.HttpResponse;
-import ch.boye.httpclientandroidlib.client.methods.HttpGet;
+
+import cz.msebera.android.httpclient.HttpResponse;
+import cz.msebera.android.httpclient.client.HttpClient;
+import cz.msebera.android.httpclient.client.methods.HttpGet;
 
 public class OPMLParser {
 
@@ -66,19 +66,7 @@ public class OPMLParser {
 			@Override
 			protected Void doInBackground(Void... params)
 			{
-				StrongHttpsClient httpClient = new StrongHttpsClient(socialReader.applicationContext);
-
-				if (socialReader.relaxedHTTPS) {
-					httpClient.enableSSLCompatibilityMode();
-				}
-
-				if (socialReader.useProxy())
-				{
-					if (LOGGING) 
-						Log.v(LOGTAG, "Using Proxy for OPML Retrieval");
-
-					httpClient.useProxy(true, socialReader.getProxyType(), socialReader.getProxyHost(), socialReader.getProxyPort());
-				}
+				HttpClient httpClient = socialReader.getHttpClient();
 		
 				HttpGet httpGet = new HttpGet(urlToParse);
 				httpGet.setHeader("User-Agent", SocialReader.USERAGENT);

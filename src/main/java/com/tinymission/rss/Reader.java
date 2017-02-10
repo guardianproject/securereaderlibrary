@@ -1,7 +1,9 @@
 package com.tinymission.rss;
 
-import ch.boye.httpclientandroidlib.Header;
-import info.guardianproject.netcipher.client.StrongHttpsClient;
+import cz.msebera.android.httpclient.Header;
+import cz.msebera.android.httpclient.HttpResponse;
+import cz.msebera.android.httpclient.client.HttpClient;
+import cz.msebera.android.httpclient.client.methods.HttpGet;
 import info.guardianproject.securereader.SocialReader;
 
 import java.io.IOException;
@@ -26,8 +28,6 @@ import org.xml.sax.helpers.DefaultHandler;
 import android.content.res.AssetManager;
 import android.net.Uri;
 import android.util.Log;
-import ch.boye.httpclientandroidlib.HttpResponse;
-import ch.boye.httpclientandroidlib.client.methods.HttpGet;
 
 /**
  * Reads an RSS feed and creates and RssFeed object.
@@ -42,20 +42,30 @@ public class Reader
 
 	private SocialReader socialReader;
 
+	InputStream is;
+
 	/**
 	 * The allowed tags to parse content from (everything else gets lumped into
 	 * its parent content, which allows for embedding html content.
 	 * 
 	 */
-	public final static String[] CONTENT_TAGS = { "title", "link", "language", "pubDate", "lastBuildDate", "docs", "generator", "managingEditor", "webMaster",
-			"guid", "author", "category", "content:encoded", "description", "url", "extrss:id", "wfw:commentRss" };
+	public final static String[] CONTENT_TAGS = {
+			"title", "link", "language", "pubDate", "lastBuildDate",
+			"docs", "generator", "managingEditor", "webMaster", "guid",
+			"author", "dc:creator", "category", "content:encoded", "description", "url",
+			"extrss:id", "wfw:commentRss",
+			"id", "updated", "summary", "content", "name", "email"
+	};
+	// title, link,
 
 	/**
 	 * The tags that should be parsed into separate entities, not just
 	 * properties of existing entities.
 	 * 
 	 */
-	public final static String[] ENTITY_TAGS = { "channel", "item", "media:content", "media:thumbnail", "enclosure", "image" };
+	public final static String[] ENTITY_TAGS = { "channel", "item", "media:content", "media:thumbnail", "enclosure", "image",
+		"feed", "entry", "author", "link"
+	};
 
 	/**
 	 * @return whether tag is a valid content tag
@@ -93,6 +103,16 @@ public class Reader
 		socialReader = _socialReader;
 		_feed.setStatus(Feed.STATUS_SYNC_IN_PROGRESS);
 		feed = _feed;
+	}
+
+	public void stop() {
+		if (is != null) {
+			try {
+				is.close();
+			} catch (IOException ioe) {
+				if (LOGGING) ioe.printStackTrace();
+			}
+		}
 	}
 
 	/**
@@ -153,9 +173,9 @@ public class Reader
 			}
 
 			final String PREFIX = "file:///android_asset/";
+
 			// If it's an input stream or a file url then we are dealing with an input stream
 			if (feed.getInputStream() != null || feedUrl.startsWith("file:///")) {
-				InputStream is = null;
 
 				// If it's not an input stream, get the inputstream
 				if (feed.getInputStream() == null) {
@@ -189,20 +209,7 @@ public class Reader
 
 			} else {
 
-				StrongHttpsClient httpClient = new StrongHttpsClient(socialReader.applicationContext);
-
-				if (socialReader.relaxedHTTPS) {
-					httpClient.enableSSLCompatibilityMode();
-				}
-
-				if (socialReader.useProxy())
-				{
-				    httpClient.useProxy(true, socialReader.getProxyType(), socialReader.getProxyHost(), socialReader.getProxyPort());
-					//httpClient.useProxy(true, "HTTP", "127.0.0.1", 8080);
-
-				    if (LOGGING)
-				    	Log.v(LOGTAG,"Using Proxy: " + socialReader.getProxyType() + socialReader.getProxyHost() + socialReader.getProxyPort());
-				}
+				HttpClient httpClient = socialReader.getHttpClient();
 
 				if (feedUrl != null && !(feedUrl.isEmpty()))
 				{
@@ -287,6 +294,12 @@ public class Reader
 				ise.printStackTrace();
 			feed.setStatus(Feed.STATUS_LAST_SYNC_PARSE_ERROR);
 		}
+		catch (Exception e)
+		{
+			if (LOGGING)
+				e.printStackTrace();
+			feed.setStatus(Feed.STATUS_LAST_SYNC_PARSE_ERROR);
+		}
 		return feed;
 	}
 
@@ -323,13 +336,31 @@ public class Reader
 		@Override
 		public void startElement(String uri, String localName, String qName, Attributes attributes) throws SAXException
 		{
-			if (isContentTag(localName) || isContentTag(qName))
+			if (isEntityTag(qName))
 			{
-				_contentBuilder = new StringBuilder();
-			}
-			else if (isEntityTag(qName))
-			{
-				if (qName.equals("item"))
+				if (qName.equals("link")) {
+					FeedEntity lastEntity = _entityStack.lastElement();
+
+					// Link in ATOM is an entity, in RSS a content tag
+					if (attributes != null)
+					{
+						for (int i = 0; i < attributes.getLength(); i++)
+						{
+							String name = attributes.getLocalName(i);
+							if (name.equalsIgnoreCase("href")) {
+								String value = attributes.getValue(i);
+								if (lastEntity.getClass() == Item.class)
+								{
+									((Item) lastEntity).setLink(value);
+								}
+							}
+						}
+					} else {
+						// It's content tag
+						_contentBuilder = new StringBuilder();
+					}
+				}
+				else if (qName.equals("item") || qName.equals("entry"))
 				{
 					Item item = new Item(attributes);
 					_entityStack.add(item);
@@ -378,7 +409,7 @@ public class Reader
 						Log.v(LOGTAG,"Found media thumbnail");
 					_entityStack.add(mediaThumbnail);
 				}
-				else if (qName.equals("channel"))
+				else if (qName.equals("channel") || qName.equals("feed") || qName.equals("entry"))
 				{
 					// this is just the start of the feed
 				}
@@ -397,8 +428,14 @@ public class Reader
 				}
 				else
 				{
-					throw new RuntimeException("Don't know how to create an entity from tag " + qName);
+					if (LOGGING)
+						Log.v(LOGTAG, "Don't know how to create an entity from tag " + qName);
+					//throw new RuntimeException("Don't know how to create an entity from tag " + qName);
 				}				
+			}
+			else if (isContentTag(localName) || isContentTag(qName))
+			{
+				_contentBuilder = new StringBuilder();
 			}
 		}
 
@@ -411,9 +448,28 @@ public class Reader
 			String content = "";
 			if (isContentTag(qName))
 			{
+				//"id", "updated", "summary", "content", "name", "email"
+				// title, link,
+
 				content = StringEscapeUtils.unescapeXml(_contentBuilder.toString().trim());
 
 				if (qName.equalsIgnoreCase("content:encoded"))
+				{
+					qName = "contentEncoded";
+				}
+				else if (qName.equalsIgnoreCase("id"))
+				{
+					qName = "guid";
+				}
+				else if (qName.equalsIgnoreCase("updated"))
+				{
+					qName = "pubDate";
+				}
+				else if (qName.equalsIgnoreCase("summary"))
+				{
+					qName = "description";
+				}
+				else if (qName.equalsIgnoreCase("content"))
 				{
 					qName = "contentEncoded";
 				}
@@ -422,7 +478,11 @@ public class Reader
 					if (LOGGING)
 						Log.v(LOGTAG,"Got a remotePostId:" + content);
 					qName = "remotePostId";
-				} 
+				}
+				else if (qName.equalsIgnoreCase("dc:creator"))
+				{
+					qName = "author";
+				}
 				else if (qName.equalsIgnoreCase("wfw:commentRss")) 
 				{
 					if (LOGGING)

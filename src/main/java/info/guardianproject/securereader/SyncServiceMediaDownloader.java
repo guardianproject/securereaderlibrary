@@ -1,10 +1,12 @@
 package info.guardianproject.securereader;
 
-import info.guardianproject.netcipher.client.StrongHttpsClient;
+import cz.msebera.android.httpclient.HttpEntity;
+import cz.msebera.android.httpclient.HttpResponse;
+import cz.msebera.android.httpclient.HttpStatus;
+import cz.msebera.android.httpclient.client.HttpClient;
+import cz.msebera.android.httpclient.client.methods.HttpGet;
 import info.guardianproject.securereader.SyncService.SyncTask;
-import info.guardianproject.iocipher.File;
-import info.guardianproject.iocipher.FileInputStream;
-import info.guardianproject.iocipher.FileOutputStream;
+import info.guardianproject.iocipher.*;
 
 import java.io.BufferedOutputStream;
 import java.io.IOException;
@@ -18,24 +20,21 @@ import android.os.Message;
 import android.os.Messenger;
 import android.os.RemoteException;
 import android.util.Log;
-import ch.boye.httpclientandroidlib.HttpEntity;
-import ch.boye.httpclientandroidlib.HttpResponse;
-import ch.boye.httpclientandroidlib.HttpStatus;
-import ch.boye.httpclientandroidlib.client.ClientProtocolException;
-import ch.boye.httpclientandroidlib.client.methods.HttpGet;
 
 import com.tinymission.rss.MediaContent;
 
 public class SyncServiceMediaDownloader implements Runnable
 {
 	public final static boolean LOGGING = false;
-	public final static String LOGTAG = "SyncServiceMediaDownloader";
+	public final static String LOGTAG = "SyncServiceMdDwnlder";
 
 	SyncService syncService;
 	SyncService.SyncTask syncTask;
 	
 	Messenger messenger;
 	Handler runHandler;
+
+	InputStream inputStream;
 		
 	public SyncServiceMediaDownloader(SyncService _syncService, SyncService.SyncTask _syncTask)
 	{
@@ -69,6 +68,13 @@ public class SyncServiceMediaDownloader implements Runnable
 		out.close();
 	}
 
+	public void stop() {
+		try {
+			inputStream.close();
+		} catch (IOException ioe) {
+			if (LOGGING) ioe.printStackTrace();
+		}
+	}
 
 	@Override
 	public void run() 
@@ -77,7 +83,7 @@ public class SyncServiceMediaDownloader implements Runnable
 			Log.v(LOGTAG, "SyncServiceMediaDownloader: run");
 
 		File savedFile = null;
-		InputStream inputStream = null;
+		inputStream = null;
 
 		MediaContent mediaContent = syncTask.mediaContent;
 		
@@ -172,21 +178,10 @@ public class SyncServiceMediaDownloader implements Runnable
 					mediaContent.setDownloaded(true);
 					// End Replacement
 					*/
-					StrongHttpsClient httpClient = new StrongHttpsClient(syncService.getApplicationContext());
-
 					SocialReader socialReader = SocialReader.getInstance(syncService.getApplicationContext());
 
-					if (socialReader.relaxedHTTPS) {
-						httpClient.enableSSLCompatibilityMode();
-					}
+					HttpClient httpClient = socialReader.getHttpClient();
 
-					if (socialReader.useProxy())
-					{
-						httpClient.useProxy(true, socialReader.getProxyType(), socialReader.getProxyHost(), socialReader.getProxyPort());
-
-						if (LOGGING)
-							Log.v(LOGTAG, "MediaDownloader: USE_TOR");
-					}
 
 					HttpGet httpGet = new HttpGet(mediaContent.getUrl());
 					httpGet.setHeader("User-Agent", SocialReader.USERAGENT);
@@ -253,19 +248,7 @@ public class SyncServiceMediaDownloader implements Runnable
 				sr.getStoreBitmapDimensions(mediaContent);
 				sr.setMediaContentDownloaded(mediaContent);
 			}
-			catch (ClientProtocolException e)
-			{
-				// TODO Auto-generated catch block
-				if (LOGGING)
-					e.printStackTrace();
-			}
-			catch (IOException e)
-			{
-				// TODO Auto-generated catch block
-				if (LOGGING)
-					e.printStackTrace();
-			}
-			catch (URISyntaxException e)
+			catch (Exception e)
 			{
 				// TODO Auto-generated catch block
 				if (LOGGING)

@@ -12,6 +12,8 @@ import android.os.Binder;
 import android.os.IBinder;
 import android.util.Log;
 
+import info.guardianproject.iocipher.VirtualFileSystem;
+
 public class SyncService extends Service {
 
 	public static final String LOGTAG = "SyncService";
@@ -44,7 +46,14 @@ public class SyncService extends Service {
     public void onDestroy() {
     	if (LOGGING)
     		Log.v(LOGTAG,"onDestroy");
-    }
+
+		for (int i = 0; i < syncList.size(); i++) {
+			if (syncList.get(i).status == SyncTask.STARTED) {
+				syncList.get(i).stop();
+				syncList.get(i).status = SyncTask.CANCELLED;
+			}
+		}
+	}
 
     // Bind with Activities
     @Override
@@ -115,8 +124,12 @@ public class SyncService extends Service {
     	
     	public static final long MAXTIME = 3600000; // 60 * 60 * 1000 = 1 hour;  
     	public long startTime = -1;
-    	
-    	SyncTask(Feed _feed, SyncServiceFeedFetcher.SyncServiceFeedFetchedCallback _callback) {
+
+		SyncServiceMediaDownloader ssMediaDownloader;
+		SyncServiceCommentsFeedFetcher commentsFeedFetcher;
+		SyncServiceFeedFetcher feedFetcher;
+
+		SyncTask(Feed _feed, SyncServiceFeedFetcher.SyncServiceFeedFetchedCallback _callback) {
     		feed = _feed;
     		type = TYPE_FEED;
     		callback = _callback;
@@ -150,10 +163,24 @@ public class SyncService extends Service {
     			startCommentsFeedFetcher();
     		}
     	}
+
+		void stop() {
+			try {
+				if (type == TYPE_FEED) {
+					stopFeedFetcher();
+				} else if (type == TYPE_MEDIA) {
+					stopMediaDownloader();
+				} else if (type == TYPE_COMMENTS) {
+				//	stopCommentsFeedFetcher();
+				}
+			} catch (Exception ignored) {
+			}
+		}
     	
     	private void startMediaDownloader() {
-    		SyncServiceMediaDownloader ssMediaDownloader = new SyncServiceMediaDownloader(SyncService.this,this);
-    		
+			ssMediaDownloader = new SyncServiceMediaDownloader(SyncService.this,this);
+
+
     		if (LOGGING)
     			Log.v(LOGTAG,"Create and start ssMediaDownloader ");
     		syncThread = new Thread(ssMediaDownloader);
@@ -161,6 +188,12 @@ public class SyncService extends Service {
     		updateStatus(SyncTask.STARTED);
     		startTime = System.currentTimeMillis();
     	}
+
+		private void stopMediaDownloader() {
+			if (ssMediaDownloader != null) {
+				ssMediaDownloader.stop();
+			}
+		}
     	    	
     	private void startFeedFetcher() {
     		//SyncServiceFeedFetcher feedFetcher = new SyncServiceFeedFetcher(SyncService.this,feed);
@@ -168,7 +201,7 @@ public class SyncService extends Service {
     		
     		if (LOGGING)
     			Log.v(LOGTAG,"Create SyncServiceFeedFetcher");
-    		SyncServiceFeedFetcher feedFetcher = new SyncServiceFeedFetcher(SyncService.this,this);
+			feedFetcher = new SyncServiceFeedFetcher(SyncService.this,this);
     		
     		if (LOGGING)
     			Log.v(LOGTAG,"Create and start fetcherThread ");
@@ -177,11 +210,17 @@ public class SyncService extends Service {
     		updateStatus(SyncTask.STARTED);
     		startTime = System.currentTimeMillis();
     	}
+
+		private void stopFeedFetcher() {
+			if (feedFetcher != null) {
+				feedFetcher.stop();
+			}
+		}
     	
     	private void startCommentsFeedFetcher() {    		
     		if (LOGGING)
     			Log.v(LOGTAG,"Create SyncServiceCommentsFeedFetcher");
-    		SyncServiceCommentsFeedFetcher commentsFeedFetcher = new SyncServiceCommentsFeedFetcher(SyncService.this,this);
+			commentsFeedFetcher = new SyncServiceCommentsFeedFetcher(SyncService.this,this);
     		
     		if (LOGGING)
     			Log.v(LOGTAG,"Create and start fetcherThread ");
@@ -189,7 +228,13 @@ public class SyncService extends Service {
     		syncThread.start();    	
     		updateStatus(SyncTask.STARTED);
     		startTime = System.currentTimeMillis();
-    	}    	
+    	}
+
+		private void stopCommentsFeedFetcher() {
+			if (commentsFeedFetcher != null) {
+				commentsFeedFetcher.stop();
+			}
+		}
     	
     	void taskComplete(int status) {
     		if (status == FINISHED) {

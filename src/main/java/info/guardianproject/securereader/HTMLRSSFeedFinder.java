@@ -1,27 +1,34 @@
 package info.guardianproject.securereader;
 
+import cz.msebera.android.httpclient.HttpResponse;
+import cz.msebera.android.httpclient.client.HttpClient;
+import cz.msebera.android.httpclient.client.methods.HttpGet;
+
 import info.guardianproject.iocipher.File;
 import info.guardianproject.iocipher.FileInputStream;
-import info.guardianproject.netcipher.client.StrongHttpsClient;
+import info.guardianproject.netcipher.client.StrongBuilder;
+import info.guardianproject.netcipher.client.StrongHttpClientBuilder;
 
 import java.io.BufferedInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Date;
 
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
 import org.xml.sax.Attributes;
+import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
 import android.os.AsyncTask;
 import android.util.Log;
-import ch.boye.httpclientandroidlib.HttpResponse;
-import ch.boye.httpclientandroidlib.client.methods.HttpGet;
+
+import com.tinymission.rss.Feed;
 
 public class HTMLRSSFeedFinder {
 	
@@ -84,43 +91,66 @@ public class HTMLRSSFeedFinder {
 			@Override
 			protected Void doInBackground(Void... params)
 			{
-				StrongHttpsClient httpClient = new StrongHttpsClient(socialReader.applicationContext);
+                try {
+                    StrongHttpClientBuilder builder = StrongHttpClientBuilder.forMaxSecurity(socialReader.applicationContext);
+                    if (socialReader.useProxy()) {
+                        builder.withSocksProxy();
+                        //				    httpClient.useProxy(true, socialReader.getProxyType(), socialReader.getProxyHost(), socialReader.getProxyPort());
 
-				if (socialReader.relaxedHTTPS) {
-					httpClient.enableSSLCompatibilityMode();
-				}
+                    }
 
-				if (socialReader.useProxy())
-				{
-					if (LOGGING)
-						Log.v(LOGTAG,"Using Proxy for HTML Retrieval");
+                    builder.build(new StrongBuilder.Callback<HttpClient>() {
+                        @Override
+                        public void onConnected(HttpClient httpClient) {
 
-					httpClient.useProxy(true, socialReader.getProxyType(), socialReader.getProxyHost(), socialReader.getProxyPort());
-				}
-						
-				HttpGet httpGet = new HttpGet(urlToParse);
-				httpGet.setHeader("User-Agent", SocialReader.USERAGENT);
-				
-				HttpResponse response;
-				try {
-					response = httpClient.execute(httpGet);
-				
-					if (response.getStatusLine().getStatusCode() == 200) {
-						if (LOGGING)
-							Log.v(LOGTAG,"Response Code is good for HTML");
-						
-						InputStream	is = response.getEntity().getContent();
-						parse(is);
-						is.close();
-					}
-				} catch (IllegalStateException e) {
-					if (LOGGING)
-						e.printStackTrace();
-				} catch (IOException e) {
-					if (LOGGING)
-						e.printStackTrace();
-				}
-				
+
+                            HttpGet httpGet = new HttpGet(urlToParse);
+                            httpGet.setHeader("User-Agent", SocialReader.USERAGENT);
+
+                            HttpResponse response;
+                            try {
+                                response = httpClient.execute(httpGet);
+
+                                if (response.getStatusLine().getStatusCode() == 200) {
+                                    if (LOGGING)
+                                        Log.v(LOGTAG, "Response Code is good for HTML");
+
+                                    InputStream is = response.getEntity().getContent();
+                                    parse(is);
+                                    is.close();
+                                }
+                            } catch (IllegalStateException e) {
+                                if (LOGGING)
+                                    e.printStackTrace();
+                            } catch (IOException e) {
+                                if (LOGGING)
+                                    e.printStackTrace();
+                            }
+
+                        }
+
+                        @Override
+                        public void onConnectionException(Exception e) {
+
+                        }
+
+                        @Override
+                        public void onTimeout() {
+
+                        }
+
+                        @Override
+                        public void onInvalid() {
+
+                        }
+                    });
+                }
+                catch (Exception e)
+                {
+                    Log.e(LOGTAG,"error fetching feed",e);
+                }
+
+
 				return null;
 			}
 
@@ -147,7 +177,7 @@ public class HTMLRSSFeedFinder {
 	
 	public HTMLRSSFeedFinder(File fileToParse, HTMLRSSFeedFinderListener listener) {
 		try {
-			BufferedInputStream bis = new BufferedInputStream(new FileInputStream(fileToParse));			
+			BufferedInputStream bis = new BufferedInputStream(new FileInputStream(fileToParse));
 			parse(bis);
 			bis.close();	
 			

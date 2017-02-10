@@ -16,30 +16,46 @@
 
 package redstone.xmlrpc;
 
-import info.guardianproject.netcipher.client.StrongHttpsClient;
-
 import java.io.BufferedInputStream;
+import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStreamWriter;
 import java.io.StringWriter;
 import java.io.Writer;
+import java.net.HttpURLConnection;
 import java.net.URL;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import org.thoughtcrime.ssl.pinning.util.PinningHelper;
 import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 
+import android.app.Activity;
 import android.content.Context;
 import android.util.Log;
-import ch.boye.httpclientandroidlib.Header;
-import ch.boye.httpclientandroidlib.HttpHost;
-import ch.boye.httpclientandroidlib.HttpResponse;
-import ch.boye.httpclientandroidlib.client.methods.HttpPost;
-import ch.boye.httpclientandroidlib.entity.AbstractHttpEntity;
-import ch.boye.httpclientandroidlib.entity.StringEntity;
-import ch.boye.httpclientandroidlib.message.BasicHeader;
+
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.TrustManagerFactory;
+
+import cz.msebera.android.httpclient.client.HttpClient;
+import cz.msebera.android.httpclient.client.methods.HttpPost;
+import cz.msebera.android.httpclient.entity.StringEntity;
+import cz.msebera.android.httpclient.message.BasicHeader;
+import info.guardianproject.securereader.NoSSLv3SocketFactory;
+import info.guardianproject.securereader.R;
+import info.guardianproject.securereader.SocialReader;
+import cz.msebera.android.httpclient.*;
+
 
 /**
  * An XmlRpcClient represents a connection to an XML-RPC enabled server. It
@@ -65,13 +81,19 @@ public class XmlRpcClient extends XmlRpcParser implements XmlRpcInvocationHandle
 	 */
 
 	/**
-	 * @see #XmlRpcClient(String,boolean)
+	 * @see #XmlRpcClient(URL url,boolean, String[])
 	 */
 
-	public XmlRpcClient(URL url)
+	public XmlRpcClient(URL url, boolean streamMessages, String[] pinnedCert)
 	{
 		this.url = url;
-		writer = new StringWriter(2048);
+
+        this.pinnedCert = pinnedCert;
+
+        this.streamMessages = streamMessages;
+
+		if (!streamMessages)
+			writer = new StringWriter(2048);
 
 	}
 
@@ -107,7 +129,7 @@ public class XmlRpcClient extends XmlRpcParser implements XmlRpcInvocationHandle
 
 	public void setRequestProperty(String name, String value)
 	{
-		if (requestProperties == null)
+		if (requestProperties == null)https://www.airbnb.com/users/show/17042045
 		{
 			requestProperties = new HashMap();
 		}
@@ -316,7 +338,18 @@ public class XmlRpcClient extends XmlRpcParser implements XmlRpcInvocationHandle
 	{
 		try
 		{
-			((StringWriter) writer).getBuffer().setLength(0);
+			if ( streamMessages )
+			{
+				openConnection();
+				writer = new BufferedWriter(
+						new OutputStreamWriter(
+								connection.getOutputStream(),
+								XmlRpcMessages.getString( "XmlRpcClient.Encoding" ) ) );
+			}
+			else
+			{
+				( ( StringWriter ) writer ).getBuffer().setLength( 0 );
+			}
 
 			writer.write("<?xml version=\"1.0\" encoding=\"");
 			writer.write(XmlRpcMessages.getString("XmlRpcClient.Encoding"));
@@ -350,12 +383,18 @@ public class XmlRpcClient extends XmlRpcParser implements XmlRpcInvocationHandle
 			writer.write("</params>");
 			writer.write("</methodCall>");
 
-			String xmlOut = ((StringWriter) writer).getBuffer().toString();
-			StringEntity entity = new StringEntity(xmlOut);
-			entity.setContentType(new BasicHeader("Content-Type", "text/xml; charset=" + XmlRpcMessages.getString("XmlRpcClient.Encoding")));
+            if ( streamMessages )
+            {
+                writer.flush();
+            }
+            else {
+                String xmlOut = ((StringWriter) writer).getBuffer().toString();
+                StringEntity entity = new StringEntity(xmlOut, XmlRpcMessages.getString("XmlRpcClient.Encoding"));
+                entity.setContentType(new BasicHeader("Content-Type", "text/xml; charset=" + XmlRpcMessages.getString("XmlRpcClient.Encoding")));
 
-			Log.d("XmlRpc", xmlOut);
-			hResp = openConnection(entity);
+                Log.d("XmlRpc", xmlOut);
+                hResp = postContent(entity);
+            }
 
 			handleResponse();
 		}
@@ -374,6 +413,12 @@ public class XmlRpcClient extends XmlRpcParser implements XmlRpcInvocationHandle
 			{ /* Closed or not, we don't care at this point. */
 			}
 
+            if (streamMessages)
+            {
+                connection.disconnect();
+                connection = null;
+            }
+
 		}
 
 		return returnValue;
@@ -388,9 +433,7 @@ public class XmlRpcClient extends XmlRpcParser implements XmlRpcInvocationHandle
 	 * 
 	 * If the user does not want the socket to be kept alive or if the server
 	 * does not support keep-alive, the socket is closed.
-	 * 
-	 * @param inout
-	 *            The stream containing the server response to interpret.
+	 *
 	 * 
 	 * @throws IOException
 	 *             If a socket error occurrs, or if the XML returned is
@@ -401,32 +444,68 @@ public class XmlRpcClient extends XmlRpcParser implements XmlRpcInvocationHandle
 
 	private void handleResponse() throws XmlRpcFault
 	{
-		try
-		{
-			parse(new BufferedInputStream(hResp.getEntity().getContent()));
+        if (streamMessages)
+        {
+            try
+            {
+                int status = connection.getResponseCode();
 
-			headerFields.clear();
+                parse( new BufferedInputStream( connection.getInputStream() ) );
 
-			Header[] headers = hResp.getAllHeaders();
+                int fieldNumber = 1;
+                String headerFieldKey = null;
+                headerFields.clear();
 
-			for (Header header : headers)
-			{
-				headerFields.put(header.getName(), header.getValue());
+                if (connection.getResponseCode() != 200)
+                {
+                    throw new XmlRpcFault(connection.getResponseCode(), connection.getResponseMessage());
+                }
 
-			}
-		}
-		catch (Exception e)
-		{
-			throw new XmlRpcException(XmlRpcMessages.getString("XmlRpcClient.ParseError"), e);
-		}
+                while ( ( headerFieldKey = connection.getHeaderFieldKey( fieldNumber ) ) != null )
+                {
+                    headerFields.put( headerFieldKey, connection.getHeaderField( fieldNumber ) );
+                    ++fieldNumber;
+                }
+            }
+            catch ( Exception e )
+            {
+                Log.e("XMLRPC","handleResponse error: " + e.getMessage(),e);
+                throw new XmlRpcException(
+                        XmlRpcMessages.getString( "XmlRpcClient.ParseError" ), e );
 
-		if (isFaultResponse)
-		{
-			XmlRpcStruct fault = (XmlRpcStruct) returnValue;
-			isFaultResponse = false;
+            }
 
-			throw new XmlRpcFault(fault.getInteger("faultCode"), fault.getString("faultString"));
-		}
+        }
+        else {
+            try {
+                if (hResp.getStatusLine().getStatusCode() == 403) {
+                    //forbidden error
+                    throw new XmlRpcFault(403, hResp.getStatusLine().getReasonPhrase());
+
+                } else {
+                    parse(new BufferedInputStream(hResp.getEntity().getContent()));
+
+                    headerFields.clear();
+
+                    Header[] headers = hResp.getAllHeaders();
+
+                    for (Header header : headers) {
+                        headerFields.put(header.getName(), header.getValue());
+
+                    }
+                }
+            } catch (Exception e) {
+                throw new XmlRpcException(XmlRpcMessages.getString("XmlRpcClient.ParseError"), e);
+            }
+
+        }
+
+        if (isFaultResponse) {
+            XmlRpcStruct fault = (XmlRpcStruct) returnValue;
+            isFaultResponse = false;
+
+            throw new XmlRpcFault(fault.getInteger("faultCode"), fault.getString("faultString"));
+        }
 	}
 
 	/**
@@ -480,23 +559,13 @@ public class XmlRpcClient extends XmlRpcParser implements XmlRpcInvocationHandle
 	 *             internal java.net.HttpURLConnection.
 	 */
 
-	private HttpResponse openConnection(AbstractHttpEntity entity) throws IOException
+	private HttpResponse postContent(StringEntity entity) throws IOException
 	{
-		StrongHttpsClient httpClient = new StrongHttpsClient(mContext);
 
-//		if (socialReader.relaxedHTTPS) {
-//			httpClient.enableSSLCompatibilityMode();
-//		}
-
-		if (mUseProxy)
-		{
-			httpClient.useProxy(true, mProxyType, mProxyHost, mProxyPort);
-			Log.v(LOGTAG, "Using Proxy in XmlRpcClient");
-			//httpClient.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, new HttpHost(mProxyHost, mProxyPort));
-		}
+		HttpClient httpClient = SocialReader.getInstance(mContext).getHttpClient();
 
 		HttpPost request = new HttpPost(url.toExternalForm());
-
+		request.setHeader("User-Agent", SocialReader.USERAGENT);
 		request.setHeader("Content-Type", "text/xml; charset=" + XmlRpcMessages.getString("XmlRpcClient.Encoding"));
 
 		if (requestProperties != null)
@@ -515,6 +584,56 @@ public class XmlRpcClient extends XmlRpcParser implements XmlRpcInvocationHandle
 		return httpClient.execute(request);
 	}
 
+	private void openConnection() throws IOException
+	{
+
+        if (pinnedCert != null)
+		    connection = PinningHelper.getPinnedHttpsURLConnection(mContext, pinnedCert, url);
+        else
+            connection = (HttpsURLConnection) url.openConnection();
+
+		SSLSocketFactory NoSSLv3Factory = new NoSSLv3SocketFactory(getSSLSocketFactory(mContext));
+		connection.setSSLSocketFactory(NoSSLv3Factory);
+
+        /**
+        if (mUseProxy)
+        {
+            httpClient.useProxy(true, mProxyType, mProxyHost, mProxyPort);
+            Log.v(LOGTAG, "Using Proxy in XmlRpcClient");
+            //httpClient.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, new HttpHost(mProxyHost, mProxyPort));
+        }**/
+
+		connection.setDoInput( true );
+		connection.setDoOutput( true );
+        connection.setUseCaches(false);
+
+        connection.setRequestMethod( "POST" );
+
+        connection.setRequestProperty("Connection", "Keep-Alive");
+        connection.setRequestProperty("Cache-Control", "no-cache");
+		connection.setRequestProperty(
+				"Content-Type", "text/xml; charset=" +
+						XmlRpcMessages.getString( "XmlRpcClient.Encoding" ) );
+
+		if ( requestProperties != null )
+		{
+			for ( Iterator propertyNames = requestProperties.keySet().iterator();
+				  propertyNames.hasNext(); )
+			{
+				String propertyName = ( String ) propertyNames.next();
+
+				connection.setRequestProperty(
+						propertyName,
+						( String ) requestProperties.get( propertyName ) );
+			}
+		}
+
+
+
+
+
+	}
+
 	public static void setContext(Context context)
 	{
 		mContext = context;
@@ -526,12 +645,47 @@ public class XmlRpcClient extends XmlRpcParser implements XmlRpcInvocationHandle
 		mProxyType = proxyType;
 		mProxyHost = proxyHost;
 		mProxyPort = proxyPort;
+
 	}
+
+    public static SSLSocketFactory getSSLSocketFactory (Context context)
+    {
+        try {
+            KeyStore keyStore = loadKeyStore(context);
+            TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            trustManagerFactory.init(keyStore);
+
+            SSLContext ctx = SSLContext.getInstance("TLSv1");
+            ctx.init(null, trustManagerFactory.getTrustManagers(), null);
+
+            return ctx.getSocketFactory();
+        } catch (Exception e) {
+            throw new AssertionError(e);
+        }
+    }
+
+    private static KeyStore loadKeyStore (Context context) throws KeyStoreException, NoSuchAlgorithmException, CertificateException, IOException
+    {
+
+        KeyStore trustStore = KeyStore.getInstance(TRUSTSTORE_TYPE);
+        // load our bundled cacerts from raw assets
+        InputStream in = context.getResources().openRawResource(R.raw.debiancacerts);
+        trustStore.load(in, TRUSTSTORE_PASSWORD.toCharArray());
+
+        return trustStore;
+    }
+
+    private final static String TRUSTSTORE_TYPE = "BKS";
+    private final static String TRUSTSTORE_PASSWORD = "changeit";
 
 	/** The server URL. */
 	private final URL url;
 
-	/** HTTP Resposne **/
+    /*** Pinned Cert **/
+    private String[] pinnedCert;
+
+
+    /** HTTP Resposne **/
 	private HttpResponse hResp = null; // latest response
 
 	/** The Android App Context **/
@@ -556,11 +710,15 @@ public class XmlRpcClient extends XmlRpcParser implements XmlRpcInvocationHandle
 	private Object returnValue;
 
 	/** Writer to which XML-RPC messages are serialized. */
-	private final Writer writer;
+	private Writer writer;
 
 	/** Indicates whether or not the incoming response is a fault response. */
 	private boolean isFaultResponse;
 
 	/** The serializer used to serialize arguments. */
 	private final XmlRpcSerializer serializer = new XmlRpcSerializer();
+
+	private boolean streamMessages = false;
+
+	private HttpsURLConnection connection;
 }

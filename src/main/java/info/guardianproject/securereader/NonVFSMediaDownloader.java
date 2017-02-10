@@ -1,7 +1,5 @@
 package info.guardianproject.securereader;
 
-import info.guardianproject.netcipher.client.StrongHttpsClient;
-
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -11,13 +9,17 @@ import java.io.InputStream;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.util.Log;
-import ch.boye.httpclientandroidlib.HttpEntity;
-import ch.boye.httpclientandroidlib.HttpResponse;
-import ch.boye.httpclientandroidlib.HttpStatus;
-import ch.boye.httpclientandroidlib.client.ClientProtocolException;
-import ch.boye.httpclientandroidlib.client.methods.HttpGet;
 
 import com.tinymission.rss.MediaContent;
+
+import cz.msebera.android.httpclient.HttpEntity;
+import cz.msebera.android.httpclient.HttpResponse;
+import cz.msebera.android.httpclient.HttpStatus;
+import cz.msebera.android.httpclient.client.ClientProtocolException;
+import cz.msebera.android.httpclient.client.HttpClient;
+import cz.msebera.android.httpclient.client.methods.HttpGet;
+import info.guardianproject.netcipher.client.StrongBuilder;
+import info.guardianproject.netcipher.client.StrongHttpClientBuilder;
 
 public class NonVFSMediaDownloader extends AsyncTask<MediaContent, Integer, File>
 {
@@ -51,26 +53,33 @@ public class NonVFSMediaDownloader extends AsyncTask<MediaContent, Integer, File
 		if (LOGGING) 
 			Log.v(LOGTAG, "doInBackground");
 
-		InputStream inputStream = null;
-
 		if (params.length == 0)
 			return null;
 
 		MediaContent mediaContent = params[0];
-		StrongHttpsClient httpClient = new StrongHttpsClient(socialReader.applicationContext);
+		return doGet (socialReader.getHttpClient(), mediaContent);
+	}
 
-		if (socialReader.relaxedHTTPS) {
-			httpClient.enableSSLCompatibilityMode();
-		}
+	@Override
+	protected void onProgressUpdate(Integer... progress)
+	{
+		//if (LOGGING)
+		// Log.v(LOGTAG, progress[0].toString());
+	}
 
-		if (socialReader.useProxy())
+	@Override
+	protected void onPostExecute(File cachedFile)
+	{
+		if (callback != null)
 		{
-			if (LOGGING) 
-				Log.v(LOGTAG, "USE_PROXY");
-
-			httpClient.useProxy(true, socialReader.getProxyType(), socialReader.getProxyHost(), socialReader.getProxyPort());
+			callback.mediaDownloaded(cachedFile);
 		}
-		
+	}
+
+	private File doGet (HttpClient httpClient, MediaContent mediaContent)
+	{
+
+
 		if (mediaContent.getUrl() != null && !(mediaContent.getUrl().isEmpty()))
 		{
 			try
@@ -79,7 +88,7 @@ public class NonVFSMediaDownloader extends AsyncTask<MediaContent, Integer, File
 
 				HttpGet httpGet = new HttpGet(mediaContent.getUrl());
 				httpGet.setHeader("User-Agent", SocialReader.USERAGENT);
-				
+
 				HttpResponse response = httpClient.execute(httpGet);
 
 				int statusCode = response.getStatusLine().getStatusCode();
@@ -103,7 +112,7 @@ public class NonVFSMediaDownloader extends AsyncTask<MediaContent, Integer, File
 					Log.v(LOGTAG, "MediaDownloader: " + mediaContent.getType().toString());
 
 				BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(savedFile));
-				inputStream = entity.getContent();
+				InputStream inputStream = entity.getContent();
 				long size = entity.getContentLength();
 
 				byte data[] = new byte[1024];
@@ -133,22 +142,6 @@ public class NonVFSMediaDownloader extends AsyncTask<MediaContent, Integer, File
 			}
 		}
 
-		return savedFile;
-	}
-
-	@Override
-	protected void onProgressUpdate(Integer... progress)
-	{
-		//if (LOGGING)
-		// Log.v(LOGTAG, progress[0].toString());
-	}
-
-	@Override
-	protected void onPostExecute(File cachedFile)
-	{
-		if (callback != null)
-		{
-			callback.mediaDownloaded(cachedFile);
-		}
+        return savedFile;
 	}
 }

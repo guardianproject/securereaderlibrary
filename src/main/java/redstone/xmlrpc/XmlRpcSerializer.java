@@ -16,7 +16,14 @@
 
 package redstone.xmlrpc;
 
+import android.util.Base64OutputStream;
+import android.util.Log;
+
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -223,8 +230,67 @@ public class XmlRpcSerializer
         else if ( value instanceof byte[] )
         {
             writer.write( "<base64>" );
-            writer.write( Base64.encode( ( byte[] ) value ) );
+
+            byte[] bData = (byte[])value;
+
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            Base64OutputStream b64out = new Base64OutputStream(baos,android.util.Base64.NO_WRAP);
+
+            boolean keepLooping = true;
+
+            int chunkSize = 3000;
+            int byteIdx = 0;
+
+
+            for (int i = byteIdx; i < bData.length; )
+            {
+                if (i + chunkSize > bData.length)
+                {
+                    chunkSize = bData.length-i;
+                }
+
+                b64out.write(bData,i,chunkSize);
+                b64out.flush();
+
+                String b64string = baos.toString();
+                writer.write(b64string);
+                baos.reset();
+
+                i += chunkSize;
+            }
+
+            //writer.write( Base64.encode( ( byte[] ) value ) );
             writer.write( "</base64>" );
+        }
+        else if (value instanceof InputStream)
+        {
+            writer.write( "<base64>" );
+
+            InputStream is = (InputStream)value;
+
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            Base64OutputStream b64out = new Base64OutputStream(baos,android.util.Base64.NO_WRAP);
+
+            boolean keepLooping = true;
+
+            int chunkSize = 3000;
+
+            int i = 0;
+            byte[] buffer = new byte[chunkSize];
+            while ((i = is.read(buffer)) >= 0) {
+
+                b64out.write(buffer,0,i);
+                b64out.flush();
+
+                String b64string = baos.toString();
+                writer.write(b64string);
+                baos.reset();
+
+            }
+
+            //writer.write( Base64.encode( ( byte[] ) value ) );
+            writer.write( "</base64>" );
+
         }
         else
         {

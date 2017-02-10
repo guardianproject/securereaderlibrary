@@ -1,10 +1,16 @@
 package com.tinymission.rss;
 
-import info.guardianproject.netcipher.client.StrongHttpsClient;
+import cz.msebera.android.httpclient.HttpResponse;
+import cz.msebera.android.httpclient.client.HttpClient;
+import cz.msebera.android.httpclient.client.methods.HttpGet;
+import info.guardianproject.netcipher.client.StrongBuilder;
+import info.guardianproject.netcipher.client.StrongConnectionBuilder;
+import info.guardianproject.netcipher.client.StrongHttpClientBuilder;
 import info.guardianproject.securereader.SocialReader;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.HttpURLConnection;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Stack;
@@ -24,8 +30,6 @@ import org.xml.sax.helpers.DefaultHandler;
 import android.content.res.AssetManager;
 import android.net.Uri;
 import android.util.Log;
-import ch.boye.httpclientandroidlib.HttpResponse;
-import ch.boye.httpclientandroidlib.client.methods.HttpGet;
 
 /**
  * Reads an RSS feed and creates and RssFeed object.
@@ -42,13 +46,15 @@ public class CommentReader
 
 	private SocialReader socialReader;
 
+	InputStream is;
+
 	/**
 	 * The allowed tags to parse content from (everything else gets lumped into
 	 * its parent content, which allows for embedding html content.
 	 * 
 	 */
 	public final static String[] CONTENT_TAGS = { "title", "link", "language", "pubDate", "lastBuildDate", "docs", "generator", "managingEditor", "webMaster",
-			"guid", "author", "category", "content:encoded", "description", "url", "extrss:id" };
+			"guid", "author", "category", "content:encoded", "description", "url", "extrss:id", "dc:creator" };
 
 	/**
 	 * The tags that should be parsed into separate entities, not just
@@ -95,6 +101,17 @@ public class CommentReader
 		item = _item;
 	}
 
+
+	public void stop() {
+		if (is != null) {
+			try {
+				is.close();
+			} catch (IOException ioe) {
+				if (LOGGING) ioe.printStackTrace();
+			}
+		}
+	}
+
 	/**
 	 * Actually grabs the feed from the URL and parses it into java objects.
 	 * 
@@ -108,7 +125,7 @@ public class CommentReader
 			spf.setNamespaceAware(true);
 			SAXParser sp = spf.newSAXParser();
 
-			XMLReader xr = sp.getXMLReader();
+			final XMLReader xr = sp.getXMLReader();
 			
 			xr.setErrorHandler(new ErrorHandler() { 
 				public void error(SAXParseException exception) throws SAXException {
@@ -137,51 +154,54 @@ public class CommentReader
 			Handler handler = new Handler();
 			xr.setContentHandler(handler);
 
-				StrongHttpsClient httpClient = new StrongHttpsClient(socialReader.applicationContext);
+			HttpClient httpClient = socialReader.getHttpClient();
 
-			if (socialReader.relaxedHTTPS) {
-				httpClient.enableSSLCompatibilityMode();
-			}
-
-
-			if (socialReader.useProxy())
-				{
-				    httpClient.useProxy(true, socialReader.getProxyType(), socialReader.getProxyHost(), socialReader.getProxyPort());
-				}
-	
-				if (item.getCommentsUrl() != null && !(item.getCommentsUrl().isEmpty()))
-				{
+			if (item.getCommentsUrl() != null && !(item.getCommentsUrl().isEmpty()))
+			{
+				try {
 					HttpGet httpGet = new HttpGet(item.getCommentsUrl());
 					httpGet.setHeader("User-Agent", SocialReader.USERAGENT);
 
 					HttpResponse response = httpClient.execute(httpGet);
-	
+
 					if (response.getStatusLine().getStatusCode() == 200) {
 						if (LOGGING)
-							Log.v(LOGTAG,"Response Code is good");
-						
-						InputStream is = response.getEntity().getContent();
+							Log.v(LOGTAG, "Response Code is good");
+
+						is = response.getEntity().getContent();
 						xr.parse(new InputSource(is));
-						
+
 						is.close();
-	
+
 						Date currentDate = new Date();
 						item.setStatus(Feed.STATUS_LAST_SYNC_GOOD);
-						
+
 					} else {
-						Log.v(LOGTAG,"Response Code: " + response.getStatusLine().getStatusCode());
+						Log.v(LOGTAG, "Response Code: " + response.getStatusLine().getStatusCode());
 						if (response.getStatusLine().getStatusCode() == 404) {
 							item.setStatus(Feed.STATUS_LAST_SYNC_FAILED_404);
 						} else {
 							item.setStatus(Feed.STATUS_LAST_SYNC_FAILED_UNKNOWN);
 						}
 					}
-				} else {
-					if (LOGGING) 
-						Log.e(LOGTAG, "Failed to sync feed, bad URL " + item.getCommentsUrl());
-					
-					item.setStatus(Feed.STATUS_LAST_SYNC_FAILED_BAD_URL);
+
 				}
+				catch (Exception ioe)
+				{
+					if (LOGGING)
+						Log.e("SAX XML", "sax parse io error", ioe);
+					item.setStatus(Feed.STATUS_LAST_SYNC_PARSE_ERROR);
+
+				}
+			} else {
+				if (LOGGING)
+					Log.e(LOGTAG, "Failed to sync feed, bad URL " + item.getCommentsUrl());
+
+				item.setStatus(Feed.STATUS_LAST_SYNC_FAILED_BAD_URL);
+			}
+
+	
+
 		}
 		catch (ParserConfigurationException pce)
 		{
@@ -197,19 +217,19 @@ public class CommentReader
 			item.setStatus(Feed.STATUS_LAST_SYNC_PARSE_ERROR);
 
 		}
-		catch (IOException ioe)
-		{
-			if (LOGGING) 
-				Log.e("SAX XML", "sax parse io error", ioe);
-			item.setStatus(Feed.STATUS_LAST_SYNC_PARSE_ERROR);
-
-		}
 		catch (IllegalStateException ise)
 		{
 			if (LOGGING)
 				ise.printStackTrace();
 			item.setStatus(Feed.STATUS_LAST_SYNC_PARSE_ERROR);
 		}
+		catch (Exception ise)
+		{
+			if (LOGGING)
+				ise.printStackTrace();
+			item.setStatus(Feed.STATUS_LAST_SYNC_PARSE_ERROR);
+		}
+
 		return feed;
 	}
 
@@ -283,6 +303,10 @@ public class CommentReader
 				{
 					qName = "contentEncoded";
 				}
+				else if (qName.equalsIgnoreCase("dc:creator"))
+				{
+					qName = "author";
+				}
 				else if (qName.equalsIgnoreCase("extrss:id"))
 				{
 					qName = "remotePostId";
@@ -291,7 +315,8 @@ public class CommentReader
 			}
 			else if (isEntityTag(qName))
 			{
-				_entityStack.pop();
+				if (!_entityStack.isEmpty())
+					_entityStack.pop();
 			}
 		}
 

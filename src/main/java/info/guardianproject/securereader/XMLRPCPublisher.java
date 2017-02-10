@@ -6,17 +6,24 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.List;
 
-import net.bican.wordpress.MediaObject;
-import net.bican.wordpress.Page;
-import net.bican.wordpress.Wordpress;
+import redstone.xmlrpc.XmlRpcArray;
 import redstone.xmlrpc.XmlRpcClient;
 import redstone.xmlrpc.XmlRpcStruct;
 import android.os.AsyncTask;
+import android.text.TextUtils;
 import android.util.Log;
 
 import com.tinymission.rss.Item;
 import com.tinymission.rss.MediaContent;
+
+import net.bican.wordpress.Enclosure;
+import net.bican.wordpress.MediaItem;
+import net.bican.wordpress.MediaItemUploadResult;
+import net.bican.wordpress.Post;
+import net.bican.wordpress.Term;
+import net.bican.wordpress.Wordpress;
 
 /**
  * Class for fetching the feed content in the background.
@@ -33,6 +40,7 @@ public class XMLRPCPublisher extends AsyncTask<Item, Integer, Integer>
 	public static final int FAILURE_UNKNOWN = -4;
 	
 	SocialReporter socialReporter;
+	Item item;
 
 	XMLRPCPublisherCallback itemPublishedCallback;
 
@@ -56,7 +64,6 @@ public class XMLRPCPublisher extends AsyncTask<Item, Integer, Integer>
 	@Override
 	protected Integer doInBackground(Item... params)
 	{
-		Item item = new Item();
 		if (params.length == 0)
 		{
 			if (LOGGING)
@@ -77,6 +84,8 @@ public class XMLRPCPublisher extends AsyncTask<Item, Integer, Integer>
 					if (!socialReporter.socialReader.useProxy()) {
 						// Gotta enable that proxy
 						return FAILURE_REASON_NO_PRIVACY_PROXY;
+					} else if (!socialReporter.socialReader.isProxyOnline()) {
+						return FAILURE_REASON_NO_CONNECTION;
 					}
 					XmlRpcClient.setProxy(true, socialReporter.socialReader.getProxyType(), socialReporter.socialReader.getProxyHost(), socialReporter.socialReader.getProxyPort());
 				}
@@ -98,7 +107,9 @@ public class XMLRPCPublisher extends AsyncTask<Item, Integer, Integer>
 					// acxu.createUser
 					ArrayList<String> arguments = new ArrayList<String>();
 					arguments.add(nickname);
-					XmlRpcClient xpc = new XmlRpcClient(new URL(socialReporter.xmlrpcEndpoint));
+
+					boolean doStreaming = true;
+					XmlRpcClient xpc = new XmlRpcClient(new URL(socialReporter.xmlrpcEndpoint),doStreaming,socialReporter.xmlrpcEndpointPinnedCert);
 					String result = (String) xpc.invoke("acxu.createUser", arguments);
 					if (LOGGING) 
 						Log.v(LOGTAG,"From wordpress: " + result);
@@ -114,17 +125,22 @@ public class XMLRPCPublisher extends AsyncTask<Item, Integer, Integer>
 				
 				if (xmlRPCUsername != null && xmlRPCPassword != null) 
 				{
-	
-					if (LOGGING) 
+					if (LOGGING)
 						Log.v(LOGTAG, "Logging into XMLRPC Interface: " + xmlRPCUsername + '@' + socialReporter.xmlrpcEndpoint);
 					Wordpress wordpress = new Wordpress(xmlRPCUsername, xmlRPCPassword, socialReporter.xmlrpcEndpoint);
-	
-					Page page = new Page();
-					page.setTitle(item.getTitle());
-	
+
+					Post post = new Post();
+					post.setPost_type("post");
+					post.setPost_title(item.getTitle());
+					post.setPost_status("publish");
+
 					StringBuffer sbBody = new StringBuffer();
 					sbBody.append(item.getDescription());
-	
+
+					boolean hasSetHeading = false;
+					ArrayList<MediaItemUploadResult> mediaObjects = new ArrayList<>();
+					int thumbnail = -1;
+
 					ArrayList<MediaContent> mediaContent = item.getMediaContent();
 					for (MediaContent mc : mediaContent)
 					{
@@ -136,32 +152,88 @@ public class XMLRPCPublisher extends AsyncTask<Item, Integer, Integer>
 						if (fileUri != null)
 						{
 							File f = new File(fileUri.getPath());
-							MediaObject mObj = wordpress.newMediaObject("image/jpeg", f, false);
-	
-							if (mObj != null)
-							{
-		
-								sbBody.append("\n\n<a href=\"" + mObj.getUrl() + "\">Link to media</a>");
-	
+							String mimeType = "image/jpeg";
+							if (mc.getType() != null)
+								mimeType = mc.getType();
+							MediaItemUploadResult res = wordpress.uploadFile(mimeType, f);
+							if (res != null) {
+								if (LOGGING)
+									Log.d(LOGTAG, "Uploaded " + res.getUrl() + " with id " + res.getId());
+								mediaObjects.add(res);
+								if (mc.getMediaContentType() == MediaContent.MediaContentType.IMAGE) {
+									if (thumbnail == -1)
+										thumbnail = res.getId();
+									//sbBody.append("\n\n[gallery ids=\"" + res.getId() + "\"]");
+									sbBody.append("\n\n<img src=\"" + res.getUrl() + "\"/>");
+									//sbBody.append("\n\n[embed]" + res.getUrl() + "[/embed]");
+								} else {
+									sbBody.append("\n\n[embed]" + res.getUrl() + "[/embed]");
+								}
+//								if (mc.getMediaContentType() == MediaContent.MediaContentType.IMAGE) {
+//									if (!hasSetHeading) {
+//										hasSetHeading = true;
+//										sbBody.insert(0, "<img src=\"" + res.getUrl() + "\"/>\n\n");
+//									} else {
+//										sbBody.append("\n\n<img src=\"" + res.getUrl() + "\"/>");
+//									}
+//								} else {
+//									sbBody.append("\n\n[embed]" + res.getUrl() + "[/embed]");
+//								}
+
 								// This should
-								XmlRpcStruct enclosureStruct = new XmlRpcStruct();
-								enclosureStruct.put("url", mObj.getUrl());
-								enclosureStruct.put("length", f.length());
-								enclosureStruct.put("type", mObj.getType());
-								page.setEnclosure(enclosureStruct);
-	
+								//Enclosure enclosureStruct = new Enclosure();
+								//enclosureStruct.setLength((int)f.length());
+								//enclosureStruct.setType(res.getType());
+								//enclosureStruct.setUrl(res.getUrl());
+								//post.setEnclosure(enclosureStruct);
 							}
 						}
 					}
-	
-					page.setDescription(sbBody.toString());
-					boolean publish = true;
-	
-					String postId = wordpress.newPost(page, publish);
+
+					post.setPost_content(sbBody.toString());
+					post.setComment_status("open");
+					if (item.getTags() != null && item.getTags().size() > 0) {
+						ArrayList<Term> tags = new ArrayList<>();
+						for (String tag : item.getTags()) {
+							Term newTerm = new Term();
+							newTerm.setTaxonomy("post_tag");
+							newTerm.setName(tag);
+							try {
+								if (LOGGING)
+									Log.d(LOGTAG, "Creating tag for " + newTerm.getName());
+								Integer id = wordpress.newTerm(newTerm);
+								if (LOGGING)
+									Log.d(LOGTAG, "Got id " + id);
+								newTerm.setTerm_id(id);
+								tags.add(newTerm);
+							} catch(Exception e) {
+								e.printStackTrace();
+								if (LOGGING)
+									Log.d(LOGTAG, "Got error " + e.toString());
+							}
+						}
+						if (tags.size() > 0) {
+							post.setTerms(tags);
+						}
+					}
+					if (thumbnail != -1) {
+						// Set featured image
+						post.setPost_thumbnail(thumbnail);
+					}
+					int postId = wordpress.newPost(post);
 					if (LOGGING)
 						Log.v(LOGTAG, "Posted: " + postId);
-					
-					return Integer.valueOf(postId);
+
+					if (postId != 0) {
+						item.dbsetRemotePostId(postId);
+						// Link media to post
+						for (MediaItemUploadResult mediaUpload : mediaObjects) {
+							Post mediaUpdate = new Post();
+							mediaUpdate.setPost_parent(postId);
+							wordpress.editPost(mediaUpload.getId(), mediaUpdate);
+						}
+					}
+					return postId;
 					
 				} else {
 					if (LOGGING)
@@ -194,6 +266,8 @@ public class XMLRPCPublisher extends AsyncTask<Item, Integer, Integer>
 		if (itemPublishedCallback != null)
 		{
 			if (status >= 0) {
+				item.setFeedId(DatabaseHelper.POSTS_FEED_ID);
+				socialReporter.saveDraft(item);
 				itemPublishedCallback.itemPublished(status);
 			} else {
 				itemPublishedCallback.publishingFailed(status);

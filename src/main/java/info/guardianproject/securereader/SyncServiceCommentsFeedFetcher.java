@@ -20,14 +20,16 @@ import com.tinymission.rss.Reader;
 public class SyncServiceCommentsFeedFetcher implements Runnable
 {
 	public final static boolean LOGGING = false;
-	public final static String LOGTAG = "SyncServiceCommentsFeedFetcher";
+	public final static String LOGTAG = "SyncServiceComments";
 
 	SyncService syncService;
 	SyncService.SyncTask syncTask;
 	
 	Messenger messenger;
 	Handler runHandler;
-	
+
+	CommentReader reader;
+
 	public interface SyncServiceCommentsFeedFetchedCallback
 	{
 		public void commentsFeedFetched(Item _item);
@@ -48,17 +50,20 @@ public class SyncServiceCommentsFeedFetcher implements Runnable
 		
 		messenger = new Messenger(runHandler);
 	}
-	
+
+	public void stop() {
+		reader.stop();
+	}
 	
 	@Override
 	public void run() {		
-		CommentReader reader = new CommentReader(SocialReader.getInstance(syncService.getApplicationContext()), syncTask.item);
+		reader = new CommentReader(SocialReader.getInstance(syncService.getApplicationContext()), syncTask.item);
 		Feed tempFeed = reader.fetchCommentFeed();
 
 		SocialReader.getInstance(syncService.getApplicationContext()).setItemComments(syncTask.item, tempFeed.getComments());			
 		
 		if (LOGGING)
-			Log.v(LOGTAG,"syncTask.item " + syncTask.item.getDatabaseId() + " should be complete " + tempFeed.getCommentCount() + " comments found");
+			Log.v(LOGTAG,"syncTask.item " + syncTask.item.getDatabaseId() + ": " + tempFeed.getCommentCount() + " comments");
 		
 		// Go back to the main thread
 		Message m = Message.obtain();            

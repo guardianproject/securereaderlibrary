@@ -10,18 +10,17 @@
 package info.guardianproject.securereader;
 
 //import info.guardianproject.bigbuffalo.adapters.DownloadsAdapter;
-import ch.boye.httpclientandroidlib.HttpResponse;
+import cz.msebera.android.httpclient.client.HttpClient;
 import info.guardianproject.cacheword.CacheWordHandler;
 import info.guardianproject.cacheword.Constants;
 import info.guardianproject.cacheword.ICacheWordSubscriber;
 import info.guardianproject.cacheword.IOCipherMountHelper;
-import info.guardianproject.iocipher.File;
-import info.guardianproject.iocipher.FileInputStream;
-import info.guardianproject.iocipher.FileOutputStream;
-import info.guardianproject.iocipher.VirtualFileSystem;
+import info.guardianproject.netcipher.client.StrongBuilder;
+import info.guardianproject.netcipher.client.StrongHttpClientBuilder;
 import info.guardianproject.netcipher.proxy.OrbotHelper;
 import info.guardianproject.netcipher.proxy.ProxyHelper;
 import info.guardianproject.netcipher.proxy.PsiphonHelper;
+import info.guardianproject.iocipher.*;
 import info.guardianproject.securereader.HTMLRSSFeedFinder.RSSFeed;
 import info.guardianproject.securereader.MediaDownloader.MediaDownloaderCallback;
 import info.guardianproject.securereader.Settings.ProxyType;
@@ -60,6 +59,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.graphics.BitmapFactory;
@@ -83,8 +83,7 @@ import com.tinymission.rss.MediaContent;
 import com.tinymission.rss.MediaContent.MediaContentType;
 import com.tinymission.rss.Comment;
 
-public class SocialReader implements ICacheWordSubscriber
-{
+public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnSharedPreferenceChangeListener {
 	public interface SocialReaderLockListener
 	{
 		void onLocked();
@@ -126,7 +125,8 @@ public class SocialReader implements ICacheWordSubscriber
 	public final static String TOR_PROXY_TYPE = "SOCKS";
 	public final static String TOR_PROXY_HOST = "127.0.0.1";
 	public int TOR_PROXY_PORT = 9050; // default for SOCKS Orbot/Tor
-	
+	public int TOR_PROXY_PORT_HTTP = 8118; // default for SOCKS Orbot/Tor
+
 	public final static String PSIPHON_PROXY_HOST = "127.0.0.1";
 	public final static String PSIPHON_PROXY_TYPE = "HTTP";
 	public int PSIPHON_PROXY_PORT = -1;
@@ -153,6 +153,8 @@ public class SocialReader implements ICacheWordSubscriber
 
 	private String ioCipherFilePath;
 	private VirtualFileSystem vfs;
+
+	private HttpClient httpClient = null;
 
 	public static final int DEFAULT_NUM_FEED_ITEMS = 20;
 	
@@ -225,7 +227,8 @@ public class SocialReader implements ICacheWordSubscriber
 		feedsWithComments = applicationContext.getResources().getStringArray(R.array.feed_urls_with_comments);
 		
 		this.settings = new Settings(applicationContext);
-		
+		this.settings.registerChangeListener(this);
+
 		this.cacheWord = new CacheWordHandler(applicationContext, this);
 		cacheWord.connectToService();
 		
@@ -233,17 +236,20 @@ public class SocialReader implements ICacheWordSubscriber
 	        @Override
 	        public void onReceive(Context context, Intent intent) {
 	            if (TextUtils.equals(intent.getAction(), OrbotHelper.ACTION_STATUS)) {
-	                //String status = intent.getStringExtra(OrbotHelper.EXTRA_STATUS) + " (" + intent.getStringExtra(OrbotHelper.EXTRA_PACKAGE_NAME) + ")";
-	                torRunning = (intent.getStringExtra(OrbotHelper.EXTRA_STATUS).equals(OrbotHelper.STATUS_ON));
+	                String status = intent.getStringExtra(OrbotHelper.EXTRA_STATUS);
+	                torRunning = (status.equals(OrbotHelper.STATUS_ON));
 	                
 	                if(torRunning){
-                        if (TOR_PROXY_TYPE == "HTTP" && intent.hasExtra(OrbotHelper.EXTRA_PROXY_PORT_HTTP))
+                        if (TOR_PROXY_TYPE.equals("HTTP") && intent.hasExtra(OrbotHelper.EXTRA_PROXY_PORT_HTTP))
                         	TOR_PROXY_PORT = intent.getIntExtra(OrbotHelper.EXTRA_PROXY_PORT_HTTP, -1);
                         
-                        if (TOR_PROXY_TYPE == "SOCKS" && intent.hasExtra(OrbotHelper.EXTRA_PROXY_PORT_SOCKS))
+                        if (TOR_PROXY_TYPE.equals("SOCKS") && intent.hasExtra(OrbotHelper.EXTRA_PROXY_PORT_SOCKS))
                         	TOR_PROXY_PORT = intent.getIntExtra(OrbotHelper.EXTRA_PROXY_PORT_SOCKS, -1);
 	                  
-	                }
+	                } else if (status.equals(OrbotHelper.STATUS_STARTS_DISABLED)) {
+						if (LOGGING)
+							Log.v(LOGTAG, "Not allowed to start Tor automatically");
+					}
 	            }
 	        }
 	    };	
@@ -279,6 +285,8 @@ public class SocialReader implements ICacheWordSubscriber
 			            }
 			        }
 			    }, new IntentFilter(Constants.INTENT_NEW_SECRETS));
+
+
 	}
 		
     private static SocialReader socialReader = null;
@@ -288,6 +296,56 @@ public class SocialReader implements ICacheWordSubscriber
     	}
     	return socialReader;
     }
+
+    public HttpClient getHttpClient ()
+    {
+        return httpClient;
+    }
+
+	private void initHttpClient (Context context)
+	{
+		OrbotHelper.get(context).init();
+
+		try {
+			StrongHttpClientBuilder builder = StrongHttpClientBuilder.forMaxSecurity(context);
+
+			if (socialReader.useProxy()) {
+				if (socialReader.getProxyType().equalsIgnoreCase("socks"))
+					builder.withSocksProxy();
+				else
+					builder.withHttpProxy();
+				//				    httpClient.useProxy(true, socialReader.getProxyType(), socialReader.getProxyHost(), socialReader.getProxyPort());
+			}
+
+			builder.build(new StrongBuilder.Callback<HttpClient>() {
+				@Override
+				public void onConnected(HttpClient httpClient) {
+
+					SocialReader.this.httpClient = httpClient;
+				}
+
+				@Override
+				public void onConnectionException(Exception e) {
+					Log.w(LOGTAG,"Couldn't connet httpclient",e);
+				}
+
+				@Override
+				public void onTimeout() {
+					Log.w(LOGTAG,"build httpclient timeout");
+				}
+
+				@Override
+				public void onInvalid() {
+					Log.w(LOGTAG,"build httpclient invalid");
+				}
+			});
+		}
+		catch (Exception e)
+		{
+			Log.e(LOGTAG,"error fetching feed",e);
+		}
+
+	}
 
 	Timer periodicTimer;
 	TimerTask periodicTask;
@@ -444,6 +502,8 @@ public class SocialReader implements ICacheWordSubscriber
             initialized = true;
             if (lockListener != null)
             	lockListener.onUnlocked();
+			
+			initHttpClient(applicationContext);
 
 	    } else {
 	    	if (LOGGING)
@@ -540,16 +600,7 @@ public class SocialReader implements ICacheWordSubscriber
 									Log.e(LOGTAG,"Received null after OPML Parsed");
 							}
 							settings.setLocalOpmlLoaded();
-							manualSyncSubscribedFeeds(
-									new FeedFetcher.FeedFetchedCallback()
-									{
-										@Override
-										public void feedFetched(Feed _feed)
-										{
-											checkMediaDownloadQueue();
-										}
-									}
-									);
+							backgroundSyncSubscribedFeeds();
 						}
 					}
 				);
@@ -570,7 +621,8 @@ public class SocialReader implements ICacheWordSubscriber
 					Log.v(LOGTAG,"Checking Article Expirations");
 				settings.setLastItemExpirationCheckTime(System.currentTimeMillis());
 				Date expirationDate = new Date(System.currentTimeMillis() - settings.articleExpirationMillis());
-				databaseAdapter.deleteExpiredItems(expirationDate);
+				if (databaseAdapter != null && databaseAdapter.databaseReady())
+					databaseAdapter.deleteExpiredItems(expirationDate);
 			}
 		} else {
 			if (LOGGING)
@@ -642,6 +694,8 @@ public class SocialReader implements ICacheWordSubscriber
 				finalOpmlUrl = finalOpmlUrl + "nb";
 			} else if (lang == UiLanguage.Turkish) {
 				finalOpmlUrl = finalOpmlUrl + "tr";
+			} else if (lang == UiLanguage.German) {
+				finalOpmlUrl = finalOpmlUrl + "de";
 			}
 			
 			if (!settings.networkOpmlLoaded()) {
@@ -731,14 +785,15 @@ public class SocialReader implements ICacheWordSubscriber
 							if (outlines != null) {
 								for (int i = 0; i < outlines.size(); i++) {
 									OPMLParser.OPMLOutline outlineElement = outlines.get(i);
-									
-									Feed newFeed = new Feed(outlineElement.text, outlineElement.xmlUrl);
-									newFeed.setSubscribed(outlineElement.subscribe && !databaseAdapter.isFeedUnfollowed(outlineElement.xmlUrl));
+									if (outlineElement.xmlUrl != null) {
+										Feed newFeed = new Feed(outlineElement.text, outlineElement.xmlUrl.trim());
+										newFeed.setSubscribed(outlineElement.subscribe && !databaseAdapter.isFeedUnfollowed(outlineElement.xmlUrl));
 
-									if (LOGGING)
-										Log.v(LOGTAG, "**New Feed: " + newFeed.getFeedURL() + " " + newFeed.isSubscribed());
-									
-									databaseAdapter.addOrUpdateFeed(newFeed);
+										if (LOGGING)
+											Log.v(LOGTAG, "**New Feed: " + newFeed.getFeedURL() + " " + newFeed.isSubscribed());
+
+										databaseAdapter.addOrUpdateFeed(newFeed);
+									}
 								}
 							} else {
 								if (LOGGING)
@@ -1179,7 +1234,7 @@ public class SocialReader implements ICacheWordSubscriber
 			}
 			
 			// Check Talk Feed
-			if (isOnline() == ONLINE && syncService != null && talkItem != null) {
+			if (isOnline() == ONLINE && syncService != null && talkItem != null && !TextUtils.isEmpty(talkItem.getCommentsUrl())) {
 				if (LOGGING)
 					Log.v(LOGTAG,"Adding talkItem to syncService");
 				syncService.addCommentsSyncTask(talkItem);
@@ -1453,7 +1508,7 @@ public class SocialReader implements ICacheWordSubscriber
 		return returnFeed;
 	}
 
-	public Feed getPlaylist(Feed feed) {		
+	public Feed getPlaylist(Feed feed) {
 		
 		ArrayList<String> tags = new ArrayList<String>();
 		// Tempo
@@ -1510,20 +1565,22 @@ public class SocialReader implements ICacheWordSubscriber
 			if (LOGGING)
 				Log.v(LOGTAG,"Database not empty, not inserting default feeds");
 		}
-		
-		// Create talk item
-		talkItem = new Item();
-		talkItem.setFavorite(true); // So it doesn't delete
-		talkItem.setGuid(applicationContext.getResources().getString(R.string.talk_item_feed_url));
-		talkItem.setTitle("Example Favorite");
-		talkItem.setFeedId(-1);
-		talkItem.setDescription("This is an examople favorite.  Anything you mark as a favorite will show up in this section and won't be automatically deleted");
-		talkItem.dbsetRemotePostId(applicationContext.getResources().getInteger(R.integer.talk_item_remote_id));			
-		talkItem.setCommentsUrl(applicationContext.getResources().getString(R.string.talk_item_feed_url));
-		this.databaseAdapter.addOrUpdateItem(talkItem,itemLimit);
-		if (LOGGING)
-			Log.v(LOGTAG,"talkItem has database ID " + talkItem.getDatabaseId());		
 
+		int talkItemId = applicationContext.getResources().getInteger(R.integer.talk_item_remote_id);
+		if (talkItemId != -1) {
+			// Create talk item
+			talkItem = new Item();
+			talkItem.setFavorite(true); // So it doesn't delete
+			talkItem.setGuid(applicationContext.getResources().getString(R.string.talk_item_feed_url));
+			talkItem.setTitle("Example Favorite");
+			talkItem.setFeedId(-1);
+			talkItem.setDescription("This is an example favorite.  Anything you mark as a favorite will show up in this section and won't be automatically deleted");
+			talkItem.dbsetRemotePostId(talkItemId);
+			talkItem.setCommentsUrl(applicationContext.getResources().getString(R.string.talk_item_feed_url));
+			this.databaseAdapter.addOrUpdateItem(talkItem, itemLimit);
+			if (LOGGING)
+				Log.v(LOGTAG, "talkItem has database ID " + talkItem.getDatabaseId());
+		}
 		if (LOGGING)
 			Log.v(LOGTAG,"databaseAdapter initialized");
 	}
@@ -1566,6 +1623,10 @@ public class SocialReader implements ICacheWordSubscriber
 				Log.v(LOGTAG, "Running on KITKAT or greater");
 			}
 			java.io.File[] possibleLocations = applicationContext.getExternalFilesDirs(null);
+			if (LOGGING) {
+
+				Log.v(LOGTAG, "Got " + possibleLocations.length + " locations");
+			}
 			long largestSize = 0;
 			for (int l = 0; l < possibleLocations.length; l++) {
 				if (possibleLocations[l] != null && possibleLocations[l].getAbsolutePath() != null) {	
@@ -1605,12 +1666,11 @@ public class SocialReader implements ICacheWordSubscriber
 
 		
 		if (!done) {
-			if (Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED))
+			if (Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED) && (filesDir = applicationContext.getExternalFilesDir(null)) != null)
 			{
-				if (LOGGING) 
+				if (LOGGING)
 					Log.v(LOGTAG,"sdcard mounted");
-				
-				filesDir = applicationContext.getExternalFilesDir(null);
+
 				if (!filesDir.exists())
 				{
 					if (LOGGING) 
@@ -1719,7 +1779,13 @@ public class SocialReader implements ICacheWordSubscriber
 	private void deleteFileSystem()
 	{
 		if (vfs != null && vfs.isMounted()) {
-			vfs.unmount();
+			try {
+				vfs.unmount();
+			} catch (IllegalStateException ise) {
+				if (LOGGING) ise.printStackTrace();
+				ise.printStackTrace();
+			}
+			vfs.deleteContainer();
 			vfs = null;
 		}
 
@@ -1735,7 +1801,7 @@ public class SocialReader implements ICacheWordSubscriber
 			{
 				possibleDirFiles[i].delete();
 			}
-			possibleDir.delete();	
+			possibleDir.delete();
 		}
 		
 		// This is a backup, just in case they have a removable sd card inserted but also have
@@ -2320,13 +2386,23 @@ public class SocialReader implements ICacheWordSubscriber
 			databaseAdapter = null;
 		}
 
+		/* Trying this
 		if (vfs != null && vfs.isMounted()) {
 			if (LOGGING)
 				Log.v(LOGTAG, "vfs.unmount(); vfs = null;");
-			
-			vfs.unmount();
+
+
+
+			try {
+				vfs.unmount();
+			} catch (IllegalStateException ise) {
+				if (LOGGING) ise.printStackTrace();
+				ise.printStackTrace();
+			}
+			//vfs.deleteContainer();
 			vfs = null;
 		}
+		*/
 		
 		if (LOGGING)
 			Log.v(LOGTAG, "applicationContext.deleteDatabase(DatabaseHelper.DATABASE_NAME);");
@@ -2334,7 +2410,7 @@ public class SocialReader implements ICacheWordSubscriber
 		applicationContext.deleteDatabase(DatabaseHelper.DATABASE_NAME);
 
 		if (LOGGING)
-			Log.v(LOGTAG, "deleteFileSystem()");
+			Log.v(LOGTAG, "NOT deleteFileSystem()");
 		deleteFileSystem();
 		
 		// Reset Prefs to initial state
@@ -2867,7 +2943,8 @@ public class SocialReader implements ICacheWordSubscriber
 			{
 				mediaContent.setWidth(o.outWidth);
 				mediaContent.setHeight(o.outHeight);
-				databaseAdapter.updateItemMedia(mediaContent);
+				if (databaseAdapter != null && databaseAdapter.databaseReady())
+					databaseAdapter.updateItemMedia(mediaContent);
 			}
 		}
 		catch (FileNotFoundException e)
@@ -2960,4 +3037,32 @@ public class SocialReader implements ICacheWordSubscriber
 		
 		return talkItem;
 	}
+
+	@Override
+	public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
+		// If we enable a proxy, make sure to update status
+		//
+		if ((Settings.KEY_REQUIRE_PROXY.equals(key) || Settings.KEY_PROXY_TYPE.equals(key)) && settings.requireProxy()) {
+			if (settings.proxyType() == ProxyType.Tor)
+				checkTorStatus();
+			else if (settings.proxyType() == ProxyType.Psiphon)
+				checkPsiphonStatus();
+		}
+	}
+
+	public void deleteItem(Item story)
+	{
+		if (LOGGING)
+			Log.v(LOGTAG, "deleteItem");
+		if (databaseAdapter != null && databaseAdapter.databaseReady())
+		{
+			databaseAdapter.deleteItem(story.getDatabaseId());
+		}
+		else
+		{
+			if (LOGGING)
+				Log.e(LOGTAG,"Database not ready");
+		}
+	}
+
 }

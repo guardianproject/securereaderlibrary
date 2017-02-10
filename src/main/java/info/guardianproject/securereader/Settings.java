@@ -2,10 +2,10 @@ package info.guardianproject.securereader;
 
 import java.util.Locale;
 
-import ch.boye.httpclientandroidlib.util.TextUtils;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.preference.PreferenceManager;
+import android.text.TextUtils;
 import android.util.Log;
 
 public class Settings
@@ -277,7 +277,8 @@ public class Settings
 	 */
 	public boolean wipeApp()
 	{
-		return mPrefs.getBoolean(KEY_WIPE_APP, false);
+		boolean wipeAppDefault = context.getResources().getBoolean(R.bool.wipe_app_default);
+		return mPrefs.getBoolean(KEY_WIPE_APP, wipeAppDefault);
 	}
 
 	/**
@@ -428,8 +429,9 @@ public class Settings
 
 	public enum UiLanguage
 	{
-		English, Chinese, Japanese, Norwegian, Spanish, Tibetan, Turkish, Russian, Ukrainian, Farsi, Arabic
-		//Italian, Swedish, Dutch, German, Korean, Brazilian Portuguese
+		English, Chinese, Japanese, Norwegian, Spanish, Tibetan, Turkish, Russian, Ukrainian, Farsi, Arabic,
+		German
+		//Italian, Swedish, Dutch, Korean, Brazilian Portuguese
 		// I added Arabic, perhaps prematurely
 	}
 
@@ -468,6 +470,8 @@ public class Settings
 			return UiLanguage.Ukrainian;
 		else if (defaultLanguage.equals("ru"))
 			return UiLanguage.Russian;
+		else if (defaultLanguage.equals("de"))
+			return UiLanguage.German;
 		return UiLanguage.English;
 	}
 
