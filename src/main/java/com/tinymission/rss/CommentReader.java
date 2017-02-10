@@ -1,10 +1,16 @@
 package com.tinymission.rss;
 
-import info.guardianproject.netcipher.client.StrongHttpsClient;
+import cz.msebera.android.httpclient.HttpResponse;
+import cz.msebera.android.httpclient.client.HttpClient;
+import cz.msebera.android.httpclient.client.methods.HttpGet;
+import info.guardianproject.netcipher.client.StrongBuilder;
+import info.guardianproject.netcipher.client.StrongConnectionBuilder;
+import info.guardianproject.netcipher.client.StrongHttpClientBuilder;
 import info.guardianproject.securereader.SocialReader;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.HttpURLConnection;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Stack;
@@ -24,8 +30,6 @@ import org.xml.sax.helpers.DefaultHandler;
 import android.content.res.AssetManager;
 import android.net.Uri;
 import android.util.Log;
-import ch.boye.httpclientandroidlib.HttpResponse;
-import ch.boye.httpclientandroidlib.client.methods.HttpGet;
 
 /**
  * Reads an RSS feed and creates and RssFeed object.
@@ -121,7 +125,7 @@ public class CommentReader
 			spf.setNamespaceAware(true);
 			SAXParser sp = spf.newSAXParser();
 
-			XMLReader xr = sp.getXMLReader();
+			final XMLReader xr = sp.getXMLReader();
 			
 			xr.setErrorHandler(new ErrorHandler() { 
 				public void error(SAXParseException exception) throws SAXException {
@@ -150,51 +154,81 @@ public class CommentReader
 			Handler handler = new Handler();
 			xr.setContentHandler(handler);
 
-				StrongHttpsClient httpClient = new StrongHttpsClient(socialReader.applicationContext);
+			StrongHttpClientBuilder builder = StrongHttpClientBuilder.forMaxSecurity(socialReader.applicationContext);
+			if (socialReader.useProxy())
+			{
+				builder.withSocksProxy();
+				//				    httpClient.useProxy(true, socialReader.getProxyType(), socialReader.getProxyHost(), socialReader.getProxyPort());
 
-			if (socialReader.relaxedHTTPS) {
-				httpClient.enableSSLCompatibilityMode();
 			}
 
+			builder.build(new StrongBuilder.Callback<HttpClient>() {
+				@Override
+				public void onConnected(HttpClient httpClient) {
+                    if (item.getCommentsUrl() != null && !(item.getCommentsUrl().isEmpty()))
+                    {
+                        try {
+                            HttpGet httpGet = new HttpGet(item.getCommentsUrl());
+                            httpGet.setHeader("User-Agent", SocialReader.USERAGENT);
 
-			if (socialReader.useProxy())
-				{
-				    httpClient.useProxy(true, socialReader.getProxyType(), socialReader.getProxyHost(), socialReader.getProxyPort());
-				}
-	
-				if (item.getCommentsUrl() != null && !(item.getCommentsUrl().isEmpty()))
-				{
-					HttpGet httpGet = new HttpGet(item.getCommentsUrl());
-					httpGet.setHeader("User-Agent", SocialReader.USERAGENT);
+                            HttpResponse response = httpClient.execute(httpGet);
 
-					HttpResponse response = httpClient.execute(httpGet);
-	
-					if (response.getStatusLine().getStatusCode() == 200) {
-						if (LOGGING)
-							Log.v(LOGTAG,"Response Code is good");
-						
-						is = response.getEntity().getContent();
-						xr.parse(new InputSource(is));
-						
-						is.close();
-	
-						Date currentDate = new Date();
-						item.setStatus(Feed.STATUS_LAST_SYNC_GOOD);
-						
-					} else {
-						Log.v(LOGTAG,"Response Code: " + response.getStatusLine().getStatusCode());
-						if (response.getStatusLine().getStatusCode() == 404) {
-							item.setStatus(Feed.STATUS_LAST_SYNC_FAILED_404);
-						} else {
-							item.setStatus(Feed.STATUS_LAST_SYNC_FAILED_UNKNOWN);
-						}
-					}
-				} else {
-					if (LOGGING) 
-						Log.e(LOGTAG, "Failed to sync feed, bad URL " + item.getCommentsUrl());
-					
-					item.setStatus(Feed.STATUS_LAST_SYNC_FAILED_BAD_URL);
+                            if (response.getStatusLine().getStatusCode() == 200) {
+                                if (LOGGING)
+                                    Log.v(LOGTAG, "Response Code is good");
+
+                                is = response.getEntity().getContent();
+                                xr.parse(new InputSource(is));
+
+                                is.close();
+
+                                Date currentDate = new Date();
+                                item.setStatus(Feed.STATUS_LAST_SYNC_GOOD);
+
+                            } else {
+                                Log.v(LOGTAG, "Response Code: " + response.getStatusLine().getStatusCode());
+                                if (response.getStatusLine().getStatusCode() == 404) {
+                                    item.setStatus(Feed.STATUS_LAST_SYNC_FAILED_404);
+                                } else {
+                                    item.setStatus(Feed.STATUS_LAST_SYNC_FAILED_UNKNOWN);
+                                }
+                            }
+
+                        }
+                        catch (Exception ioe)
+                        {
+                            if (LOGGING)
+                                Log.e("SAX XML", "sax parse io error", ioe);
+                            item.setStatus(Feed.STATUS_LAST_SYNC_PARSE_ERROR);
+
+                        }
+                    } else {
+                        if (LOGGING)
+                            Log.e(LOGTAG, "Failed to sync feed, bad URL " + item.getCommentsUrl());
+
+                        item.setStatus(Feed.STATUS_LAST_SYNC_FAILED_BAD_URL);
+                    }
 				}
+
+				@Override
+				public void onConnectionException(Exception e) {
+
+				}
+
+				@Override
+				public void onTimeout() {
+
+				}
+
+				@Override
+				public void onInvalid() {
+
+				}
+			});
+
+
+	
+
 		}
 		catch (ParserConfigurationException pce)
 		{
@@ -210,19 +244,19 @@ public class CommentReader
 			item.setStatus(Feed.STATUS_LAST_SYNC_PARSE_ERROR);
 
 		}
-		catch (IOException ioe)
-		{
-			if (LOGGING) 
-				Log.e("SAX XML", "sax parse io error", ioe);
-			item.setStatus(Feed.STATUS_LAST_SYNC_PARSE_ERROR);
-
-		}
 		catch (IllegalStateException ise)
 		{
 			if (LOGGING)
 				ise.printStackTrace();
 			item.setStatus(Feed.STATUS_LAST_SYNC_PARSE_ERROR);
 		}
+		catch (Exception ise)
+		{
+			if (LOGGING)
+				ise.printStackTrace();
+			item.setStatus(Feed.STATUS_LAST_SYNC_PARSE_ERROR);
+		}
+
 		return feed;
 	}
 

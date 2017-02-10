@@ -1,8 +1,9 @@
 package com.tinymission.rss;
 
-import ch.boye.httpclientandroidlib.Header;
-import ch.boye.httpclientandroidlib.impl.client.DefaultHttpClient;
-import info.guardianproject.netcipher.client.StrongHttpsClient;
+import cz.msebera.android.httpclient.Header;
+import cz.msebera.android.httpclient.HttpResponse;
+import cz.msebera.android.httpclient.client.HttpClient;
+import cz.msebera.android.httpclient.client.methods.HttpGet;
 import info.guardianproject.securereader.SocialReader;
 
 import java.io.IOException;
@@ -27,8 +28,6 @@ import org.xml.sax.helpers.DefaultHandler;
 import android.content.res.AssetManager;
 import android.net.Uri;
 import android.util.Log;
-import ch.boye.httpclientandroidlib.HttpResponse;
-import ch.boye.httpclientandroidlib.client.methods.HttpGet;
 
 /**
  * Reads an RSS feed and creates and RssFeed object.
@@ -210,8 +209,7 @@ public class Reader
 
 			} else {
 
-				//StrongHttpsClient httpClient = new StrongHttpsClient(socialReader.applicationContext);
-				DefaultHttpClient httpClient = new DefaultHttpClient();
+				HttpClient httpClient = socialReader.getHttpClient();
 
 				if (socialReader.relaxedHTTPS) {
 				//	httpClient.enableSSLCompatibilityMode();

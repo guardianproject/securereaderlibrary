@@ -2,10 +2,10 @@ package info.guardianproject.securereader;
 
 import java.util.Locale;
 
-import ch.boye.httpclientandroidlib.util.TextUtils;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.preference.PreferenceManager;
+import android.text.TextUtils;
 import android.util.Log;
 
 public class Settings

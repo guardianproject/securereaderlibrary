@@ -16,8 +16,6 @@
 
 package redstone.xmlrpc;
 
-import info.guardianproject.netcipher.client.StrongHttpsClient;
-
 import java.io.BufferedInputStream;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -49,16 +47,15 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManagerFactory;
 
-import ch.boye.httpclientandroidlib.Header;
-import ch.boye.httpclientandroidlib.HttpHost;
-import ch.boye.httpclientandroidlib.HttpResponse;
-import ch.boye.httpclientandroidlib.client.methods.HttpPost;
-import ch.boye.httpclientandroidlib.entity.AbstractHttpEntity;
-import ch.boye.httpclientandroidlib.entity.StringEntity;
-import ch.boye.httpclientandroidlib.message.BasicHeader;
+import cz.msebera.android.httpclient.client.HttpClient;
+import cz.msebera.android.httpclient.client.methods.HttpPost;
+import cz.msebera.android.httpclient.entity.StringEntity;
+import cz.msebera.android.httpclient.message.BasicHeader;
 import info.guardianproject.securereader.NoSSLv3SocketFactory;
 import info.guardianproject.securereader.R;
 import info.guardianproject.securereader.SocialReader;
+import cz.msebera.android.httpclient.*;
+
 
 /**
  * An XmlRpcClient represents a connection to an XML-RPC enabled server. It
@@ -560,21 +557,10 @@ public class XmlRpcClient extends XmlRpcParser implements XmlRpcInvocationHandle
 	 *             internal java.net.HttpURLConnection.
 	 */
 
-	private HttpResponse postContent(AbstractHttpEntity entity) throws IOException
+	private HttpResponse postContent(StringEntity entity) throws IOException
 	{
 
-		StrongHttpsClient httpClient = new StrongHttpsClient(mContext);
-
-//		if (socialReader.relaxedHTTPS) {
-//			httpClient.enableSSLCompatibilityMode();//
-	//	}
-
-		if (mUseProxy)
-		{
-			httpClient.useProxy(true, mProxyType, mProxyHost, mProxyPort);
-			Log.v(LOGTAG, "Using Proxy in XmlRpcClient");
-			//httpClient.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, new HttpHost(mProxyHost, mProxyPort));
-		}
+		HttpClient httpClient = SocialReader.getInstance(mContext).getHttpClient();
 
 		HttpPost request = new HttpPost(url.toExternalForm());
 		request.setHeader("User-Agent", SocialReader.USERAGENT);
@@ -598,12 +584,14 @@ public class XmlRpcClient extends XmlRpcParser implements XmlRpcInvocationHandle
 
 	private void openConnection() throws IOException
 	{
-		//connection = (HttpURLConnection) url.openConnection();
+		connection = (HttpsURLConnection) url.openConnection();
+		/**
         String[] pins                 = new String[] {"o+cLJOudSFO5j/QospKIAvPiMp++/OVDZm4PbLSGQus="};
         connection = PinningHelper.getPinnedHttpsURLConnection(mContext, pins, url);
 
 		SSLSocketFactory NoSSLv3Factory = new NoSSLv3SocketFactory(getSSLSocketFactory(mContext));
 		connection.setSSLSocketFactory(NoSSLv3Factory);
+		 **/
 
 		connection.setDoInput( true );
 		connection.setDoOutput( true );
@@ -653,8 +641,10 @@ public class XmlRpcClient extends XmlRpcParser implements XmlRpcInvocationHandle
 		mProxyType = proxyType;
 		mProxyHost = proxyHost;
 		mProxyPort = proxyPort;
+
 	}
 
+	/**
     public static SSLSocketFactory getSSLSocketFactory (Context context)
     {
         try {
@@ -685,6 +675,7 @@ public class XmlRpcClient extends XmlRpcParser implements XmlRpcInvocationHandle
 
     private final static String TRUSTSTORE_TYPE = "BKS";
     private final static String TRUSTSTORE_PASSWORD = "changeit";
+		**/
 
 	/** The server URL. */
 	private final URL url;

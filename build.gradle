@@ -1,11 +1,12 @@
 apply plugin: 'com.android.library'
 
 android {
+
     compileSdkVersion 23
-    buildToolsVersion "23.0.2"
+    buildToolsVersion "24.0.1"
 
     defaultConfig {
-        minSdkVersion 15
+        minSdkVersion 14
     }
 
     buildTypes {
@@ -17,19 +18,25 @@ android {
 }
 
 dependencies {
+
+
+    compile 'info.guardianproject.iocipher:IOCipher:0.4'
+
     compile 'net.zetetic:android-database-sqlcipher:3.5.4@aar'
-    //compile project(':libnetcipher')
     compile 'com.android.support:support-v4:23.2.0'
     compile 'com.google.guava:guava:18.0'
-    compile 'info.guardianproject.iocipher:IOCipher:0.4'
-    compile 'info.guardianproject.cacheword:cachewordlib:0.1.1'
-    compile files('libs/commons-codec.jar')
-    compile files('libs/commons-lang-2.6.jar')
-    compile files('libs/gp-bcc-lib.jar')
 
-    compile files('libs/jsoup-1.9.1.jar')
-    compile project(':external:NetCipher:libnetcipher')
+    compile 'info.guardianproject.cacheword:cachewordlib:0.1.1'
+    compile 'info.guardianproject.netcipher:netcipher:2.0.0-alpha1'
+    compile 'info.guardianproject.netcipher:netcipher-httpclient:2.0.0-alpha1'
+    compile 'cz.msebera.android:httpclient:4.4.1.2'
+
+    compile 'apache-codec:commons-codec:1.2'
+    compile 'apache-lang:commons-lang:2.1'
+    compile 'commons-io:commons-io:2.4'
+
+    compile 'org.jsoup:jsoup:1.9.1'
+
     compile 'org.thoughtcrime.ssl.pinning:AndroidPinning:1.0.0'
-    compile group: 'commons-io', name: 'commons-io', version: '2.0.1'
 
 }

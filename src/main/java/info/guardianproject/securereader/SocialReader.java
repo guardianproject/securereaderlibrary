@@ -10,18 +10,17 @@
 package info.guardianproject.securereader;
 
 //import info.guardianproject.bigbuffalo.adapters.DownloadsAdapter;
-import ch.boye.httpclientandroidlib.HttpResponse;
+import cz.msebera.android.httpclient.client.HttpClient;
 import info.guardianproject.cacheword.CacheWordHandler;
 import info.guardianproject.cacheword.Constants;
 import info.guardianproject.cacheword.ICacheWordSubscriber;
 import info.guardianproject.cacheword.IOCipherMountHelper;
-import info.guardianproject.iocipher.File;
-import info.guardianproject.iocipher.FileInputStream;
-import info.guardianproject.iocipher.FileOutputStream;
-import info.guardianproject.iocipher.VirtualFileSystem;
+import info.guardianproject.netcipher.client.StrongBuilder;
+import info.guardianproject.netcipher.client.StrongHttpClientBuilder;
 import info.guardianproject.netcipher.proxy.OrbotHelper;
 import info.guardianproject.netcipher.proxy.ProxyHelper;
 import info.guardianproject.netcipher.proxy.PsiphonHelper;
+import info.guardianproject.iocipher.*;
 import info.guardianproject.securereader.HTMLRSSFeedFinder.RSSFeed;
 import info.guardianproject.securereader.MediaDownloader.MediaDownloaderCallback;
 import info.guardianproject.securereader.Settings.ProxyType;
@@ -155,6 +154,8 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	private String ioCipherFilePath;
 	private VirtualFileSystem vfs;
 
+	private HttpClient httpClient = null;
+
 	public static final int DEFAULT_NUM_FEED_ITEMS = 20;
 	
 	public static final int MEDIA_ITEM_DOWNLOAD_LIMIT_PER_FEED_PER_SESSION = 5;
@@ -284,6 +285,8 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 			            }
 			        }
 			    }, new IntentFilter(Constants.INTENT_NEW_SECRETS));
+
+		initHttpClient();
 	}
 		
     private static SocialReader socialReader = null;
@@ -293,6 +296,57 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
     	}
     	return socialReader;
     }
+
+    public HttpClient getHttpClient ()
+    {
+        return httpClient;
+    }
+
+	private void initHttpClient ()
+	{
+
+		try {
+			StrongHttpClientBuilder builder = StrongHttpClientBuilder.forMaxSecurity(socialReader.applicationContext);
+			if (socialReader.useProxy()) {
+
+				if (socialReader.getProxyType().equalsIgnoreCase("socks"))
+					builder.withSocksProxy();
+				else
+					builder.withHttpProxy();
+
+				//				    httpClient.useProxy(true, socialReader.getProxyType(), socialReader.getProxyHost(), socialReader.getProxyPort());
+
+			}
+
+			builder.build(new StrongBuilder.Callback<HttpClient>() {
+				@Override
+				public void onConnected(HttpClient httpClient) {
+
+					SocialReader.this.httpClient = httpClient;
+				}
+
+				@Override
+				public void onConnectionException(Exception e) {
+
+				}
+
+				@Override
+				public void onTimeout() {
+
+				}
+
+				@Override
+				public void onInvalid() {
+
+				}
+			});
+		}
+		catch (Exception e)
+		{
+			Log.e(LOGTAG,"error fetching feed",e);
+		}
+
+	}
 
 	Timer periodicTimer;
 	TimerTask periodicTask;
@@ -3009,4 +3063,5 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 				Log.e(LOGTAG,"Database not ready");
 		}
 	}
+
 }
