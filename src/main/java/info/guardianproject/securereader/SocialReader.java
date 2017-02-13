@@ -11,6 +11,7 @@ package info.guardianproject.securereader;
 
 //import info.guardianproject.bigbuffalo.adapters.DownloadsAdapter;
 import cz.msebera.android.httpclient.client.HttpClient;
+import cz.msebera.android.httpclient.impl.client.LaxRedirectStrategy;
 import info.guardianproject.cacheword.CacheWordHandler;
 import info.guardianproject.cacheword.Constants;
 import info.guardianproject.cacheword.ICacheWordSubscriber;
@@ -307,38 +308,47 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		OrbotHelper.get(context).init();
 
 		try {
-			StrongHttpClientBuilder builder = StrongHttpClientBuilder.forMaxSecurity(context);
+			StrongHttpClientBuilder builder = new StrongHttpClientBuilder(context);
+
+			//RSS feeds and blog platforms often have redirects, that we need to handle automatically
+			builder.setRedirectStrategy(new LaxRedirectStrategy());
 
 			if (socialReader.useProxy()) {
-				if (socialReader.getProxyType().equalsIgnoreCase("socks"))
-					builder.withSocksProxy();
-				else
-					builder.withHttpProxy();
-				//				    httpClient.useProxy(true, socialReader.getProxyType(), socialReader.getProxyHost(), socialReader.getProxyPort());
-			}
+                if (socialReader.getProxyType().equalsIgnoreCase("socks"))
+                    builder = builder.withSocksProxy();
+                else
+                    builder = builder.withHttpProxy();
+                //				    httpClient.useProxy(true, socialReader.getProxyType(), socialReader.getProxyHost(), socialReader.getProxyPort());
 
-			builder.build(new StrongBuilder.Callback<HttpClient>() {
-				@Override
-				public void onConnected(HttpClient httpClient) {
+                builder.build(new StrongBuilder.Callback<HttpClient>() {
+                    @Override
+                    public void onConnected(HttpClient httpClient) {
 
-					SocialReader.this.httpClient = httpClient;
-				}
+                        SocialReader.this.httpClient = httpClient;
+                    }
 
-				@Override
-				public void onConnectionException(Exception e) {
-					Log.w(LOGTAG,"Couldn't connet httpclient",e);
-				}
+                    @Override
+                    public void onConnectionException(Exception e) {
+                        Log.w(LOGTAG, "Couldn't connet httpclient", e);
+                    }
 
-				@Override
-				public void onTimeout() {
-					Log.w(LOGTAG,"build httpclient timeout");
-				}
+                    @Override
+                    public void onTimeout() {
+                        Log.w(LOGTAG, "build httpclient timeout");
+                    }
 
-				@Override
-				public void onInvalid() {
-					Log.w(LOGTAG,"build httpclient invalid");
-				}
-			});
+                    @Override
+                    public void onInvalid() {
+                        Log.w(LOGTAG, "build httpclient invalid");
+                    }
+                });
+            }
+            else
+            {
+                Intent intent = new Intent();
+                intent.putExtra("org.torproject.android.intent.extra.STATUS","OFF");
+                SocialReader.this.httpClient = builder.build(intent);
+            }
 		}
 		catch (Exception e)
 		{
@@ -1089,6 +1099,8 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 				_activity.startActivityForResult(startIntent,-1);
 			}				
 		}		
+
+        initHttpClient(applicationContext);
 
 		return true;
 	}

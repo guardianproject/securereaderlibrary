@@ -211,6 +211,13 @@ public class Reader
 
 				HttpClient httpClient = socialReader.getHttpClient();
 
+				if (httpClient == null)
+				{
+					//httpclient not init'd yet
+					feed.setStatus(Feed.STATUS_LAST_SYNC_FAILED_UNKNOWN);
+					return feed;
+				}
+
 				if (feedUrl != null && !(feedUrl.isEmpty()))
 				{
 					HttpGet httpGet = new HttpGet(feedUrl);
