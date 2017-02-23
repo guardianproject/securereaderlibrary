@@ -342,7 +342,7 @@ public class Reader
 					FeedEntity lastEntity = _entityStack.lastElement();
 
 					// Link in ATOM is an entity, in RSS a content tag
-					if (attributes != null)
+					if (attributes != null && attributes.getLength() > 0)
 					{
 						for (int i = 0; i < attributes.getLength(); i++)
 						{
