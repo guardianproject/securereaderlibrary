@@ -103,6 +103,7 @@ public class Feed extends FeedEntity
 	private Date _pubDate;
 	private Date _lastBuildDate;
 	private String _language;
+	private String _category;
 
 	// These fields are ours, not in the RSS spec
 	private String _feedURL;
@@ -447,4 +448,21 @@ public class Feed extends FeedEntity
 	{
 		return _comments.get(position);
 	}
+
+	/**
+	 * @return The category of the feed
+	 */
+	public String getCategory()
+	{
+		return _category;
+	}
+
+	/**
+	 * @param The category of the feed to set
+	 */
+	public void setCategory(String _category)
+	{
+		this._category = _category;
+	}
+
 }

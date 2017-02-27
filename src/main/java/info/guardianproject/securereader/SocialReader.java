@@ -632,6 +632,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 									OPMLParser.OPMLOutline outlineElement = outlines.get(i);
 										
 									Feed newFeed = new Feed(outlineElement.text, outlineElement.xmlUrl);
+									newFeed.setDescription(outlineElement.description);
 									newFeed.setSubscribed(outlineElement.subscribe);
 									
 									databaseAdapter.addOrUpdateFeed(newFeed);
@@ -830,6 +831,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 									OPMLParser.OPMLOutline outlineElement = outlines.get(i);
 									if (outlineElement.xmlUrl != null) {
 										Feed newFeed = new Feed(outlineElement.text, outlineElement.xmlUrl.trim());
+										newFeed.setDescription(outlineElement.description);
 										newFeed.setSubscribed(outlineElement.subscribe && !databaseAdapter.isFeedUnfollowed(outlineElement.xmlUrl));
 
 										if (LOGGING)

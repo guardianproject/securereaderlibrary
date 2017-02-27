@@ -11,12 +11,20 @@ import info.guardianproject.iocipher.*;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathExpressionException;
+import javax.xml.xpath.XPathFactory;
 
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
 import org.xml.sax.Attributes;
+import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
 import android.os.AsyncTask;
+import android.text.TextUtils;
 import android.util.Log;
 
 import cz.msebera.android.httpclient.HttpResponse;
@@ -41,11 +49,10 @@ public class OPMLParser {
 		public String xmlUrl = "";
 		public boolean subscribe = false;
 		public String description = "";
+		public String category = null;
 	}
 	
 	ArrayList<OPMLOutline> outlines;
-	
-	OPMLOutline currentOutline;
 	
 	public interface OPMLParserListener {
 		public void opmlParsed(ArrayList<OPMLOutline> outlines);
@@ -139,65 +146,50 @@ public class OPMLParser {
 	
 	private void parse(InputStream streamToParse) {
 		try {
-			SAXParserFactory factory = SAXParserFactory.newInstance();
-			SAXParser saxParser = factory.newSAXParser();
-			OPMLParserHandler handler = new OPMLParserHandler();
-			
-			saxParser.parse(streamToParse, handler);			
-		} catch (ParserConfigurationException e) {
-			if (LOGGING)
+			XPathFactory factory = XPathFactory.newInstance();
+			XPath xPath = factory.newXPath();
+			NodeList outlines = (NodeList) xPath.evaluate("//outline[not(parent::outline)]",
+					new InputSource(streamToParse),
+					XPathConstants.NODESET);
+			for (int i = 0; i < outlines.getLength(); i++) {
+				Element outline = (Element) outlines.item(i);
+				if (!TextUtils.isEmpty(outline.getAttribute("xmlUrl")))
+				{
+					parseOutlineNode(outline, null);
+				}
+				else
+				{
+					String category = outline.getAttribute("text");
+					NodeList categoryOutlines = (NodeList) xPath.evaluate(".//outline[@xmlUrl]", outline, XPathConstants.NODESET);
+					for (int j = 0; j < categoryOutlines.getLength(); j++) {
+						parseOutlineNode((Element)categoryOutlines.item(j), category);
+					}
+				}
+			}
+		} catch (XPathExpressionException e) {
+			if (LOGGING) {
 				e.printStackTrace();
-		} catch (SAXException e) {
-			if (LOGGING)
-				e.printStackTrace();
-		} catch (IOException e) {
-			if (LOGGING)
-				e.printStackTrace();
+			}
 		}
 	}
-	
-	public class OPMLParserHandler extends DefaultHandler {
-		
-	    public void startDocument() throws SAXException {
-	    	outlines = new ArrayList<OPMLOutline>();
-	    	if (LOGGING)
-	    		Log.v(LOGTAG,"startDocument");
-	    }
-	
-	    public void endDocument() throws SAXException {
-	    	/*if (opmlParserListener != null) {
-	    		opmlParserListener.opmlParsed(outlines);
-	    	}*/
-	    	
-	    	if (LOGGING)
-	    		Log.v(LOGTAG,"endDocument");
 
-	    }
-	
-	    public void startElement(String uri, String localName, String qName, Attributes atts) throws SAXException {
-	        if (qName.equalsIgnoreCase(OUTLINE_ELEMENT)) {
-	        	currentOutline = new OPMLOutline();
-	        	currentOutline.text = atts.getValue(TEXT_ATTRIBUTE);
-	        	currentOutline.htmlUrl = atts.getValue(HTMLURL_ATTRIBUTE);
-	        	currentOutline.xmlUrl = atts.getValue(XMLURL_ATTRIBUTE);
-	        	currentOutline.description = atts.getValue(DESCRIPTION_ATTRIBUTE);
-	        	if (atts.getValue(SUBSCRIBE_ATTRIBUTE) == null || atts.getValue(SUBSCRIBE_ATTRIBUTE).equals("true")) {
-	        		currentOutline.subscribe = true;
-	        	}
-	        	
-	        	if (LOGGING)
-	        		Log.v(LOGTAG,"startElement OUTLINE_ELEMENT");
-	        }
-	    }
-	
-	    public void endElement(String uri, String localName, String qName) throws SAXException {
-	        if (qName.equalsIgnoreCase(OUTLINE_ELEMENT)) {
-	        	outlines.add(currentOutline);
-	        	
-	        	if (LOGGING)
-	        		Log.v(LOGTAG,"endElement OUTLINE_ELEMENT");
-	        }
-	        
-	    }
+	private void parseOutlineNode(Element outline, String category)
+	{
+		OPMLOutline currentOutline = new OPMLOutline();
+		currentOutline.text = outline.getAttribute(TEXT_ATTRIBUTE);
+		currentOutline.htmlUrl = outline.getAttribute(HTMLURL_ATTRIBUTE);
+		currentOutline.xmlUrl = outline.getAttribute(XMLURL_ATTRIBUTE);
+		currentOutline.description = outline.getAttribute(DESCRIPTION_ATTRIBUTE);
+		currentOutline.category = category;
+		String subscribe = outline.getAttribute("subscribe");
+		if (TextUtils.isEmpty(subscribe) || "true".equalsIgnoreCase(subscribe)) {
+			currentOutline.subscribe = true;
+		}
+		if (!TextUtils.isEmpty(currentOutline.xmlUrl)) {
+			if (outlines == null) {
+				outlines = new ArrayList<>();
+			}
+			outlines.add(currentOutline);
+		}
 	}
 }

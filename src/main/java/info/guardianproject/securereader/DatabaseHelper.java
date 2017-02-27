@@ -14,7 +14,7 @@ public class DatabaseHelper extends SQLCipherOpenHelper
 	public static boolean LOGGING = false;
 
 	public static final String DATABASE_NAME = "bigbuffalo.db";
-	public static final int DATABASE_VERSION = 3;
+	public static final int DATABASE_VERSION = 4;
 
 	public static final int POSTS_FEED_ID = -99;
 	public static final int DRAFTS_FEED_ID = -98;
@@ -31,11 +31,12 @@ public class DatabaseHelper extends SQLCipherOpenHelper
 	public static final String FEEDS_TABLE_NETWORK_PULL_DATE = "feed_network_pull_date";
 	public static final String FEEDS_TABLE_SUBSCRIBED = "feed_subscribed";
 	public static final String FEEDS_TABLE_STATUS = "feed_status";
+	public static final String FEEDS_TABLE_CATEGORY = "feed_category";
 	
 	public static final String FEEDS_TABLE_CREATE_SQL = "create table " + FEEDS_TABLE + " (" + FEEDS_TABLE_COLUMN_ID + " integer primary key autoincrement, "
 			+ FEEDS_TABLE_NETWORK_PULL_DATE + " text null," + FEEDS_TABLE_TITLE + " text not null," + FEEDS_TABLE_FEED_URL + " text not null,"
 			+ FEEDS_TABLE_LINK + " text null, " + FEEDS_TABLE_DESCRIPTION + " text null," + FEEDS_TABLE_PUBLISH_DATE + " text null,"
-			+ FEEDS_TABLE_LAST_BUILD_DATE + " text null," + FEEDS_TABLE_LANGUAGE + " text null," + FEEDS_TABLE_SUBSCRIBED + " integer default 0, " + FEEDS_TABLE_STATUS + " integer default 0);";
+			+ FEEDS_TABLE_LAST_BUILD_DATE + " text null," + FEEDS_TABLE_LANGUAGE + " text null," + FEEDS_TABLE_SUBSCRIBED + " integer default 0, " + FEEDS_TABLE_STATUS + " integer default 0, " + FEEDS_TABLE_CATEGORY + " text null);";
 
 	public static final String ITEMS_TABLE = "items";
 	public static final String ITEMS_TABLE_COLUMN_ID = "item_id";
@@ -257,6 +258,10 @@ public class DatabaseHelper extends SQLCipherOpenHelper
 			
 			_sqliteDatabase.execSQL(COMMENTS_TABLE_CREATE_SQL);
 
+		} else if (newVersion > oldVersion && oldVersion < 4 && newVersion >= 4) {
+			// Add FEEDS_TABLE_CATEGORY
+			String FEEDS_TABLE_ALTER_SQL = "alter table " + FEEDS_TABLE + " add column " + FEEDS_TABLE_CATEGORY +  " text null";
+			_sqliteDatabase.execSQL(FEEDS_TABLE_ALTER_SQL);
 		}
 	}
 }

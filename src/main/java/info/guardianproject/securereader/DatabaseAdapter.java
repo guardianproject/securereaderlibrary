@@ -82,6 +82,7 @@ public class DatabaseAdapter
 			values.put(DatabaseHelper.FEEDS_TABLE_DESCRIPTION, feed.getDescription());
 			values.put(DatabaseHelper.FEEDS_TABLE_LINK, feed.getLink());
 			values.put(DatabaseHelper.FEEDS_TABLE_STATUS, feed.getStatus());
+			values.put(DatabaseHelper.FEEDS_TABLE_CATEGORY, feed.getCategory());
 			
 			if (feed.isSubscribed())
 			{
@@ -133,7 +134,8 @@ public class DatabaseAdapter
 				+ DatabaseHelper.FEEDS_TABLE_TITLE + ", "
 				+ DatabaseHelper.FEEDS_TABLE_LINK + ", "
 				+ DatabaseHelper.FEEDS_TABLE_DESCRIPTION + ", "
-				+ DatabaseHelper.FEEDS_TABLE_FEED_URL
+				+ DatabaseHelper.FEEDS_TABLE_FEED_URL + ", "
+				+ DatabaseHelper.FEEDS_TABLE_CATEGORY
 				+ " from " + DatabaseHelper.FEEDS_TABLE
 				+ " where " + DatabaseHelper.FEEDS_TABLE_COLUMN_ID
 				+ " = ?;";
@@ -151,12 +153,14 @@ public class DatabaseAdapter
 					String url = queryCursor.getString(queryCursor.getColumnIndex(DatabaseHelper.FEEDS_TABLE_FEED_URL));
 					String link = queryCursor.getString(queryCursor.getColumnIndex(DatabaseHelper.FEEDS_TABLE_LINK));
 					String description = queryCursor.getString(queryCursor.getColumnIndex(DatabaseHelper.FEEDS_TABLE_DESCRIPTION));
+					String category = queryCursor.getString(queryCursor.getColumnIndex(DatabaseHelper.FEEDS_TABLE_CATEGORY));
 
 					feed.setDatabaseId(feedId);
 					feed.setTitle(title);
 					feed.setFeedURL(url);
 					feed.setDescription(description);
 					feed.setLink(link);
+					feed.setCategory(category);
 				}
 			}
 			queryCursor.close();
@@ -267,7 +271,8 @@ public class DatabaseAdapter
 			values.put(DatabaseHelper.FEEDS_TABLE_FEED_URL, feedUrl);
 			values.put(DatabaseHelper.FEEDS_TABLE_SUBSCRIBED, 1);
 			values.put(DatabaseHelper.FEEDS_TABLE_STATUS, Feed.STATUS_NOT_SYNCED);
-			
+			values.put(DatabaseHelper.FEEDS_TABLE_CATEGORY, (String)null);
+
 			if (databaseReady())
 				returnValue = db.insert(DatabaseHelper.FEEDS_TABLE, null, values);
 		}
@@ -405,6 +410,7 @@ public class DatabaseAdapter
 			values.put(DatabaseHelper.FEEDS_TABLE_DESCRIPTION, feed.getDescription());
 			values.put(DatabaseHelper.FEEDS_TABLE_LINK, feed.getLink());
 			values.put(DatabaseHelper.FEEDS_TABLE_STATUS, feed.getStatus());
+			values.put(DatabaseHelper.FEEDS_TABLE_CATEGORY, feed.getCategory());
 
 			if (feed.isSubscribed()) {
 				values.put(DatabaseHelper.FEEDS_TABLE_SUBSCRIBED, 1);
