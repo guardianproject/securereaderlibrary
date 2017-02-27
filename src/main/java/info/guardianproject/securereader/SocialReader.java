@@ -31,6 +31,7 @@ import info.guardianproject.securereader.SyncServiceFeedFetcher.SyncServiceFeedF
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.BufferedWriter;
+import java.io.ByteArrayInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -38,13 +39,17 @@ import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.net.URLEncoder;
 import java.security.GeneralSecurityException;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -83,6 +88,35 @@ import com.tinymission.rss.ItemToRSS;
 import com.tinymission.rss.MediaContent;
 import com.tinymission.rss.MediaContent.MediaContentType;
 import com.tinymission.rss.Comment;
+
+import org.w3c.dom.Attr;
+import org.w3c.dom.CDATASection;
+import org.w3c.dom.DOMConfiguration;
+import org.w3c.dom.DOMException;
+import org.w3c.dom.DOMImplementation;
+import org.w3c.dom.Document;
+import org.w3c.dom.DocumentFragment;
+import org.w3c.dom.DocumentType;
+import org.w3c.dom.Element;
+import org.w3c.dom.EntityReference;
+import org.w3c.dom.NamedNodeMap;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.w3c.dom.ProcessingInstruction;
+import org.w3c.dom.Text;
+import org.w3c.dom.UserDataHandler;
+import org.xml.sax.InputSource;
+
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathFactory;
 
 public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnSharedPreferenceChangeListener {
 	public interface SocialReaderLockListener
@@ -493,7 +527,9 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
             if (LOGGING)
             	Log.v(LOGTAG,"SecureSettings initialized");
 
-            syncServiceConnection = new SyncServiceConnection();
+			initHttpClient(applicationContext);
+
+			syncServiceConnection = new SyncServiceConnection();
 
             //Using startService() overrides the default service lifetime that is managed by bindService(Intent, ServiceConnection, int): it requires the service to remain running until stopService(Intent) is called, regardless of whether any clients are connected to it. Note that calls to startService() are not nesting: no matter how many times you call startService(), a single call to stopService(Intent) will stop it.
             applicationContext.startService(new Intent(applicationContext, SyncService.class));
@@ -512,9 +548,6 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
             initialized = true;
             if (lockListener != null)
             	lockListener.onUnlocked();
-			
-			initHttpClient(applicationContext);
-
 	    } else {
 	    	if (LOGGING)
 	    		Log.v(LOGTAG,"Already initialized!");
@@ -676,7 +709,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		if (LOGGING) 
 			Log.v(LOGTAG, settings.lastOPMLCheckTime() + " < " +  System.currentTimeMillis() + " - " + opmlCheckFrequency);
 		
-		if ((repeatedlyLoadNetworkOPML || !settings.networkOpmlLoaded()) && databaseAdapter != null && databaseAdapter.databaseReady() && !cacheWord.isLocked() && isOnline() == ONLINE && settings.lastOPMLCheckTime() < System.currentTimeMillis() - opmlCheckFrequency) {
+		if ((repeatedlyLoadNetworkOPML || !settings.networkOpmlLoaded()) && databaseAdapter != null && databaseAdapter.databaseReady() && httpClient != null && !cacheWord.isLocked() && isOnline() == ONLINE && settings.lastOPMLCheckTime() < System.currentTimeMillis() - opmlCheckFrequency) {
 			
 			if (LOGGING)
 				Log.v(LOGTAG,"Checking network OPML");
@@ -819,6 +852,68 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 					Log.v(LOGTAG,"Not checking OPML at this time");
 			}
 	}
+
+	public File exportSubscribedFeedsAsOPML(String fileName) {
+
+		try {
+			File opmlDir = new File(getVFSSharingDir(), "opml");
+			if (!opmlDir.exists() && !opmlDir.mkdir()) {
+				return null;
+			}
+			File savedFile = new File(opmlDir, fileName);
+			if (!savedFile.exists() && !savedFile.createNewFile()) {
+				return null;
+			}
+
+			ArrayList<Feed> subscribedFeeds = getSubscribedFeedsList();
+			StringBuilder sb = new StringBuilder();
+			sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>");
+			sb.append("<opml version=\"1.1\">");
+			sb.append("<head>");
+			sb.append("<title>");
+			sb.append(applicationContext.getString(R.string.app_name));
+			sb.append("</title>");
+			sb.append("<dateCreated>");
+			sb.append(new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", Locale.US).format(new Date()));
+			sb.append("</dateCreated>");
+			sb.append("</head>");
+			sb.append("<body>");
+			for (Feed feed : subscribedFeeds) {
+				sb.append(String.format("<outline text=\"%1$s\" xmlUrl=\"%2$s\" />", feed.getTitle(), feed.getFeedURL()));
+			}
+			sb.append("</body>");
+			sb.append("</opml>");
+
+			Document document = DocumentBuilderFactory.newInstance()
+					.newDocumentBuilder()
+					.parse(new InputSource(new ByteArrayInputStream(sb.toString().getBytes("utf-8"))));
+
+			XPath xPath = XPathFactory.newInstance().newXPath();
+			NodeList nodeList = (NodeList) xPath.evaluate("//text()[normalize-space()='']",
+					document,
+					XPathConstants.NODESET);
+
+			for (int i = 0; i < nodeList.getLength(); ++i) {
+				Node node = nodeList.item(i);
+				node.getParentNode().removeChild(node);
+			}
+
+			Transformer transformer = TransformerFactory.newInstance().newTransformer();
+			transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
+			transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "no");
+			transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+			transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "4");
+
+			FileWriter fileWriter = new FileWriter(savedFile);
+			StreamResult streamResult = new StreamResult(fileWriter);
+			transformer.transform(new DOMSource(document), streamResult);
+			return savedFile;
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+
 
 	boolean cacheWordAttached = true;
 	
@@ -2288,8 +2383,8 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	}
 	
 	public Intent getSecureShareIntent(Item item, boolean onlyPrototype) {
-		java.io.File sharingFile = new java.io.File("/test");
-		if (!onlyPrototype)
+			java.io.File sharingFile = new java.io.File("/test");
+			if (!onlyPrototype)
 			sharingFile = packageItemNonVFS(item.getDatabaseId());
 		
 		Intent sendIntent = new Intent();
