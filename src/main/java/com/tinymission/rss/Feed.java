@@ -157,7 +157,7 @@ public class Feed extends FeedEntity
 
 	public int getNumberOfMediaContent()
 	{
-		return _mediaContent.size();
+		return (_mediaContent == null) ? 0 :_mediaContent.size();
 	}
 
 	public ArrayList<MediaContent> getMediaContent()

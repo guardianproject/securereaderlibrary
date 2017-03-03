@@ -174,6 +174,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	public final static boolean RESET_DATABASE = false;
 
 	public static final String MEDIA_CONTENT_FILE_PREFIX = "mc_";
+	public static final String FEED_ICON_FILE_PREFIX = "fi_";
 	public static final String CONTENT_BUNDLE_FILE_PREFIX = "bundle_";
 	
 	public static final String TEMP_ITEM_CONTENT_FILE_NAME = "temp" + "." + CONTENT_ITEM_EXTENSION;
@@ -191,7 +192,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 
 	private HttpClient httpClient = null;
 
-	public static final int DEFAULT_NUM_FEED_ITEMS = 20;
+	public static final int DEFAULT_NUM_FEED_ITEMS = 200;
 	
 	public static final int MEDIA_ITEM_DOWNLOAD_LIMIT_PER_FEED_PER_SESSION = 5;
 	//mediaItemDownloadLimitPerFeedPerSession
