@@ -4,6 +4,8 @@ import cz.msebera.android.httpclient.Header;
 import cz.msebera.android.httpclient.HttpResponse;
 import cz.msebera.android.httpclient.client.HttpClient;
 import cz.msebera.android.httpclient.client.methods.HttpGet;
+import cz.msebera.android.httpclient.client.protocol.HttpClientContext;
+import cz.msebera.android.httpclient.client.utils.HttpClientUtils;
 import info.guardianproject.securereader.SocialReader;
 
 import java.io.IOException;
@@ -217,7 +219,6 @@ public class Reader
 					feed.setStatus(Feed.STATUS_LAST_SYNC_FAILED_UNKNOWN);
 					return feed;
 				}
-
 				if (feedUrl != null && !(feedUrl.isEmpty()))
 				{
 					HttpGet httpGet = new HttpGet(feedUrl);
@@ -226,7 +227,8 @@ public class Reader
 					if (LOGGING)
 						Log.v(LOGTAG,"Hitting: " + feedUrl);
 
-					HttpResponse response = httpClient.execute(httpGet);
+					HttpClientContext httpContext = HttpClientContext.create();
+					HttpResponse response = httpClient.execute(httpGet, httpContext);
 
 					if (LOGGING)
 						Log.v(LOGTAG,"Response: " + response.toString());
@@ -266,6 +268,7 @@ public class Reader
 							feed.setStatus(Feed.STATUS_LAST_SYNC_FAILED_UNKNOWN);
 						}
 					}
+					HttpClientUtils.closeQuietly(response);
 				} else {
 					if (LOGGING)
 						Log.e(LOGTAG, "Failed to sync feed, bad URL");

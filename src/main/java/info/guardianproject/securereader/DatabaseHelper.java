@@ -11,10 +11,10 @@ import android.util.Log;
 public class DatabaseHelper extends SQLCipherOpenHelper
 {
 	public static String LOGTAG = "DatabaseHelper";
-	public static boolean LOGGING = false;
+	public static boolean LOGGING = true;
 
 	public static final String DATABASE_NAME = "bigbuffalo.db";
-	public static final int DATABASE_VERSION = 4;
+	public static final int DATABASE_VERSION = 5;
 
 	public static final int POSTS_FEED_ID = -99;
 	public static final int DRAFTS_FEED_ID = -98;
@@ -64,10 +64,14 @@ public class DatabaseHelper extends SQLCipherOpenHelper
 			+ " text null, " + ITEMS_TABLE_CONTENT_ENCODED + " text null, " + ITEMS_TABLE_PUBLISH_DATE + " text null, " + ITEMS_TABLE_GUID + " text null, "
 			+ ITEMS_TABLE_AUTHOR + " text null, " + ITEMS_TABLE_COMMENTS_URL + " text null, " + ITEMS_TABLE_SOURCE + " text null, " + ITEMS_TABLE_CATEGORY
 			+ " text null, " + ITEMS_TABLE_FAVORITE + " boolean default 0, " + ITEMS_TABLE_SHARED + " boolean default 0, " + ITEMS_TABLE_VIEWCOUNT + " integer default 0, "
-			+ ITEMS_TABLE_REMOTE_POST_ID + " integer default -1"	+ ");";
+			+ ITEMS_TABLE_REMOTE_POST_ID + " integer default -1,"
+			+ " CONSTRAINT fk_feed FOREIGN KEY (" + ITEMS_TABLE_FEED_ID + ")"
+			+ " REFERENCES " + FEEDS_TABLE + "(" + FEEDS_TABLE_COLUMN_ID + ")"
+			+ " ON DELETE CASCADE"
+			+ ");";
 
 	public static final String ITEMS_TABLE_CREATE_INDEX = "create index item_publish_date_index on " + ITEMS_TABLE + " (" + ITEMS_TABLE_PUBLISH_DATE + ");";
-	public static final String ITEMS_TABLE_CREATE_INDEX2 = "CREATE UNIQUE INDEX feed_guid_index ON " + ITEMS_TABLE + " (" + ITEMS_TABLE_FEED_ID + "," + ITEMS_TABLE_GUID + ");";
+	public static final String ITEMS_TABLE_CREATE_INDEX2 = "CREATE UNIQUE INDEX item_feed_guid_index ON " + ITEMS_TABLE + " (" + ITEMS_TABLE_FEED_ID + "," + ITEMS_TABLE_GUID + ");";
 
 	public static final String ITEM_MEDIA_TABLE = "item_media";
 	public static final String ITEM_MEDIA_TABLE_COLUMN_ID = "item_media_id";
@@ -104,8 +108,12 @@ public class DatabaseHelper extends SQLCipherOpenHelper
 			+ ITEM_MEDIA_BITRATE + " integer null, " 
 			+ ITEM_MEDIA_FRAMERATE + " integer null, " 
 			+ ITEM_MEDIA_LANG + " text null, " 
-			+ ITEM_MEDIA_SAMPLE_RATE + " text null);";
-	public static final String ITEMS_MEDIA_TABLE_CREATE_INDEX = "CREATE UNIQUE INDEX item_url_index ON " + ITEM_MEDIA_TABLE + " (" + ITEM_MEDIA_ITEM_ID + "," + ITEM_MEDIA_URL + ");";
+			+ ITEM_MEDIA_SAMPLE_RATE + " text null,"
+			+ " CONSTRAINT fk_item FOREIGN KEY (" + ITEM_MEDIA_ITEM_ID + ")"
+			+ " REFERENCES " + ITEMS_TABLE + "(" + ITEMS_TABLE_COLUMN_ID + ")"
+			+ " ON DELETE CASCADE"
+			+ ");";
+	public static final String ITEMS_MEDIA_TABLE_CREATE_INDEX = "CREATE UNIQUE INDEX media_item_url_index ON " + ITEM_MEDIA_TABLE + " (" + ITEM_MEDIA_ITEM_ID + "," + ITEM_MEDIA_URL + ");";
 
 	public static final String SETTINGS_TABLE = "settings";
 	public static final String SETTINGS_TABLE_ID = "settings_id";
@@ -131,7 +139,12 @@ public class DatabaseHelper extends SQLCipherOpenHelper
 	public static final String ITEM_TAGS_TABLE_ITEM_ID = ITEMS_TABLE_COLUMN_ID;
 	
 	public static final String ITEM_TAGS_TABLE_CREATE_SQL =  "create table " + ITEM_TAGS_TABLE + " (" + ITEM_TAGS_TABLE_ID + " integer primary key autoincrement, "
-			+ ITEM_TAG + " text not null, " + ITEM_TAGS_TABLE_ITEM_ID + " integer not null);";
+			+ ITEM_TAG + " text not null, " + ITEM_TAGS_TABLE_ITEM_ID + " integer not null,"
+			+ " CONSTRAINT fk_item FOREIGN KEY (" + ITEM_TAGS_TABLE_ITEM_ID + ")"
+			+ " REFERENCES " + ITEMS_TABLE + "(" + ITEMS_TABLE_COLUMN_ID + ")"
+			+ " ON DELETE CASCADE"
+			+ ");";
+	public static final String ITEM_TAGS_TABLE_CREATE_INDEX = "CREATE INDEX tags_item_index ON " + ITEM_TAGS_TABLE + " (" + ITEM_TAGS_TABLE_ITEM_ID + ");";
 
 	public static final String COMMENTS_TABLE = "comments";
 	public static final String COMMENTS_TABLE_COLUMN_ID = "comment_id";
@@ -147,8 +160,13 @@ public class DatabaseHelper extends SQLCipherOpenHelper
 	public static final String COMMENTS_TABLE_CREATE_SQL = "create table " + COMMENTS_TABLE + " (" + COMMENTS_TABLE_COLUMN_ID + " integer primary key autoincrement, "
 			+ COMMENTS_TABLE_ITEM_ID + " integer not null, " + COMMENTS_TABLE_TITLE + " text null, " + COMMENTS_TABLE_LINK + " text null, " + COMMENTS_TABLE_DESCRIPTION
 			+ " text null, " + COMMENTS_TABLE_CONTENT_ENCODED + " text null, " + COMMENTS_TABLE_PUBLISH_DATE + " text null, " + COMMENTS_TABLE_GUID + " text null, "
-			+ COMMENTS_TABLE_AUTHOR + " text null);";
-		
+			+ COMMENTS_TABLE_AUTHOR + " text null,"
+			+ " CONSTRAINT fk_item FOREIGN KEY (" + COMMENTS_TABLE_ITEM_ID + ")"
+			+ " REFERENCES " + ITEMS_TABLE + "(" + ITEMS_TABLE_COLUMN_ID + ")"
+			+ " ON DELETE CASCADE"
+			+ ");";
+	public static final String COMMENTS_TABLE_CREATE_INDEX = "CREATE INDEX comments_item_index ON " + COMMENTS_TABLE + " (" + COMMENTS_TABLE_ITEM_ID + ");";
+
 	/*
 	private long _databaseId;
 	private long _itemId;
@@ -213,69 +231,68 @@ public class DatabaseHelper extends SQLCipherOpenHelper
 	}
 
 	@Override
-	public void onUpgrade(SQLiteDatabase _sqliteDatabase, int oldVersion, int newVersion)
-	{
+	public void onUpgrade(SQLiteDatabase _sqliteDatabase, int oldVersion, int newVersion) {
 		if (newVersion > oldVersion && oldVersion < 2 && newVersion >= 2) {
 			// Moving from 1 to 2
 
-			String ITEMS_TABLE_ALTER_SQL = "alter table " + ITEMS_TABLE + " add column " + ITEMS_TABLE_VIEWCOUNT +  " integer default 0";
+			String ITEMS_TABLE_ALTER_SQL = "alter table " + ITEMS_TABLE + " add column " + ITEMS_TABLE_VIEWCOUNT + " integer default 0";
 			_sqliteDatabase.execSQL(ITEMS_TABLE_ALTER_SQL);
 
 			String RENAME_ITEMS_MEDIA_TABLE = "alter table " + ITEM_MEDIA_TABLE + " rename to " + ITEM_MEDIA_TABLE + "_old";
 			_sqliteDatabase.execSQL(RENAME_ITEMS_MEDIA_TABLE);
-			
+
 			_sqliteDatabase.execSQL(ITEMS_MEDIA_TABLE_CREATE_SQL);
-			
-			String populateTable = "insert into " + ITEM_MEDIA_TABLE + "(" 
-										+ ITEM_MEDIA_TABLE_COLUMN_ID + ", " 
-										+ ITEM_MEDIA_URL + ", " 
-										+ ITEM_MEDIA_TYPE + ", " 
-										+ ITEM_MEDIA_MEDIUM + ", " 
-										+ ITEM_MEDIA_HEIGHT + ", " 
-										+ ITEM_MEDIA_WIDTH + ", "
-										+ ITEM_MEDIA_FILESIZE + ", " 
-										+ ITEM_MEDIA_DURATION + ", " 
-										+ ITEM_MEDIA_DEFAULT + ", " 
-										+ ITEM_MEDIA_EXPRESSION + ", " 
-										+ ITEM_MEDIA_BITRATE + ", " 
-										+ ITEM_MEDIA_FRAMERATE + ", " 
-										+ ITEM_MEDIA_LANG + ", "
-										+ ITEM_MEDIA_SAMPLE_RATE + ") " +  
-									"select " 
-										+ ITEM_MEDIA_TABLE_COLUMN_ID + ", " 
-										+ ITEM_MEDIA_URL + ", " 
-										+ ITEM_MEDIA_TYPE + ", " 
-										+ ITEM_MEDIA_MEDIUM + ", " 
-										+ ITEM_MEDIA_HEIGHT + ", " 
-										+ ITEM_MEDIA_WIDTH + ", "
-										+ ITEM_MEDIA_FILESIZE + ", " 
-										+ ITEM_MEDIA_DURATION + ", " 
-										+ ITEM_MEDIA_DEFAULT + ", " 
-										+ ITEM_MEDIA_EXPRESSION + ", " 
-										+ ITEM_MEDIA_BITRATE + ", " 
-										+ ITEM_MEDIA_FRAMERATE + ", " 
-										+ ITEM_MEDIA_LANG + ", "
-										+ ITEM_MEDIA_SAMPLE_RATE + " from " 
-									+ ITEM_MEDIA_TABLE + "_old" + " where " 
-										+ ITEM_MEDIA_URL + " != null and " 
-										+ ITEM_MEDIA_ITEM_ID + " != null";
-			
+
+			String populateTable = "insert into " + ITEM_MEDIA_TABLE + "("
+					+ ITEM_MEDIA_TABLE_COLUMN_ID + ", "
+					+ ITEM_MEDIA_URL + ", "
+					+ ITEM_MEDIA_TYPE + ", "
+					+ ITEM_MEDIA_MEDIUM + ", "
+					+ ITEM_MEDIA_HEIGHT + ", "
+					+ ITEM_MEDIA_WIDTH + ", "
+					+ ITEM_MEDIA_FILESIZE + ", "
+					+ ITEM_MEDIA_DURATION + ", "
+					+ ITEM_MEDIA_DEFAULT + ", "
+					+ ITEM_MEDIA_EXPRESSION + ", "
+					+ ITEM_MEDIA_BITRATE + ", "
+					+ ITEM_MEDIA_FRAMERATE + ", "
+					+ ITEM_MEDIA_LANG + ", "
+					+ ITEM_MEDIA_SAMPLE_RATE + ") " +
+					"select "
+					+ ITEM_MEDIA_TABLE_COLUMN_ID + ", "
+					+ ITEM_MEDIA_URL + ", "
+					+ ITEM_MEDIA_TYPE + ", "
+					+ ITEM_MEDIA_MEDIUM + ", "
+					+ ITEM_MEDIA_HEIGHT + ", "
+					+ ITEM_MEDIA_WIDTH + ", "
+					+ ITEM_MEDIA_FILESIZE + ", "
+					+ ITEM_MEDIA_DURATION + ", "
+					+ ITEM_MEDIA_DEFAULT + ", "
+					+ ITEM_MEDIA_EXPRESSION + ", "
+					+ ITEM_MEDIA_BITRATE + ", "
+					+ ITEM_MEDIA_FRAMERATE + ", "
+					+ ITEM_MEDIA_LANG + ", "
+					+ ITEM_MEDIA_SAMPLE_RATE + " from "
+					+ ITEM_MEDIA_TABLE + "_old" + " where "
+					+ ITEM_MEDIA_URL + " != null and "
+					+ ITEM_MEDIA_ITEM_ID + " != null";
+
 			_sqliteDatabase.execSQL(populateTable);
-			
+
 			String dropTable = "drop table " + ITEM_MEDIA_TABLE + "_old";
 			_sqliteDatabase.execSQL(dropTable);
-			
-		} else 	if (newVersion > oldVersion && oldVersion < 3 && newVersion >= 3) {
+
+		} else if (newVersion > oldVersion && oldVersion < 3 && newVersion >= 3) {
 
 			// Add ITEMS_TABLE_REMOTE_POST_ID 
-			String ITEMS_TABLE_ALTER_SQL = "alter table " + ITEMS_TABLE + " add column " + ITEMS_TABLE_REMOTE_POST_ID +  " integer default -1";
+			String ITEMS_TABLE_ALTER_SQL = "alter table " + ITEMS_TABLE + " add column " + ITEMS_TABLE_REMOTE_POST_ID + " integer default -1";
 			_sqliteDatabase.execSQL(ITEMS_TABLE_ALTER_SQL);
-			
+
 			_sqliteDatabase.execSQL(COMMENTS_TABLE_CREATE_SQL);
 
 		} else if (newVersion > oldVersion && oldVersion < 4 && newVersion >= 4) {
 			// Add FEEDS_TABLE_CATEGORY
-			String FEEDS_TABLE_ALTER_SQL = "alter table " + FEEDS_TABLE + " add column " + FEEDS_TABLE_CATEGORY +  " text null";
+			String FEEDS_TABLE_ALTER_SQL = "alter table " + FEEDS_TABLE + " add column " + FEEDS_TABLE_CATEGORY + " text null";
 			_sqliteDatabase.execSQL(FEEDS_TABLE_ALTER_SQL);
 
 			// Add index to items table
@@ -292,6 +309,79 @@ public class DatabaseHelper extends SQLCipherOpenHelper
 			if (LOGGING)
 				Log.v(LOGTAG, "SQL: " + ITEMS_MEDIA_TABLE_CREATE_INDEX);
 			_sqliteDatabase.execSQL(ITEMS_MEDIA_TABLE_CREATE_INDEX);
+		} else if (newVersion > oldVersion && oldVersion < 5 && newVersion >= 5) {
+
+			// Add index to tags table
+			if (LOGGING)
+				Log.v(LOGTAG, "SQL: " + ITEM_TAGS_TABLE_CREATE_INDEX);
+			_sqliteDatabase.execSQL(ITEM_TAGS_TABLE_CREATE_INDEX);
+
+			// Add index to comments table
+			if (LOGGING)
+				Log.v(LOGTAG, "SQL: " + COMMENTS_TABLE_CREATE_INDEX);
+			_sqliteDatabase.execSQL(COMMENTS_TABLE_CREATE_INDEX);
+
+			// Items table
+			StringBuilder sbAddForeignKeys = new StringBuilder();
+			sbAddForeignKeys.append("PRAGMA foreign_keys=off;");
+			sbAddForeignKeys.append("BEGIN TRANSACTION;");
+			sbAddForeignKeys.append("ALTER TABLE " + ITEMS_TABLE + " RENAME TO " + ITEMS_TABLE + "_old;");
+			sbAddForeignKeys.append(ITEMS_TABLE_CREATE_SQL);
+			sbAddForeignKeys.append(ITEMS_TABLE_CREATE_INDEX2);
+			sbAddForeignKeys.append(ITEMS_TABLE_CREATE_INDEX);
+			sbAddForeignKeys.append("INSERT INTO " + ITEMS_TABLE + " SELECT * FROM " + ITEMS_TABLE + "_old;");
+			sbAddForeignKeys.append("DROP TABLE " + ITEMS_TABLE + "_old;");
+			sbAddForeignKeys.append("COMMIT;");
+			sbAddForeignKeys.append("PRAGMA foreign_keys=on;");
+			if (LOGGING)
+				Log.v(LOGTAG, "SQL: " + sbAddForeignKeys);
+			_sqliteDatabase.execSQL(sbAddForeignKeys.toString());
+
+			// Item Media table
+			sbAddForeignKeys = new StringBuilder();
+			sbAddForeignKeys.append("PRAGMA foreign_keys=off;");
+			sbAddForeignKeys.append("BEGIN TRANSACTION;");
+			sbAddForeignKeys.append("ALTER TABLE " + ITEM_MEDIA_TABLE + " RENAME TO " + ITEM_MEDIA_TABLE + "_old;");
+			sbAddForeignKeys.append(ITEMS_MEDIA_TABLE_CREATE_SQL);
+			sbAddForeignKeys.append(ITEMS_MEDIA_TABLE_CREATE_INDEX);
+			sbAddForeignKeys.append("INSERT INTO " + ITEM_MEDIA_TABLE + " SELECT * FROM " + ITEM_MEDIA_TABLE + "_old;");
+			sbAddForeignKeys.append("DROP TABLE " + ITEM_MEDIA_TABLE + "_old;");
+			sbAddForeignKeys.append("COMMIT;");
+			sbAddForeignKeys.append("PRAGMA foreign_keys=on;");
+			if (LOGGING)
+				Log.v(LOGTAG, "SQL: " + sbAddForeignKeys);
+			_sqliteDatabase.execSQL(sbAddForeignKeys.toString());
+
+			// Tags table
+			sbAddForeignKeys = new StringBuilder();
+			sbAddForeignKeys.append("PRAGMA foreign_keys=off;");
+			sbAddForeignKeys.append("BEGIN TRANSACTION;");
+			sbAddForeignKeys.append("ALTER TABLE " + ITEM_TAGS_TABLE + " RENAME TO " + ITEM_TAGS_TABLE + "_old;");
+			sbAddForeignKeys.append(ITEM_TAGS_TABLE_CREATE_SQL);
+			sbAddForeignKeys.append(ITEM_TAGS_TABLE_CREATE_INDEX);
+			sbAddForeignKeys.append("INSERT INTO " + ITEM_TAGS_TABLE + " SELECT * FROM " + ITEM_TAGS_TABLE + "_old;");
+			sbAddForeignKeys.append("DROP TABLE " + ITEM_TAGS_TABLE + "_old;");
+			sbAddForeignKeys.append("COMMIT;");
+			sbAddForeignKeys.append("PRAGMA foreign_keys=on;");
+			if (LOGGING)
+				Log.v(LOGTAG, "SQL: " + sbAddForeignKeys);
+			_sqliteDatabase.execSQL(sbAddForeignKeys.toString());
+
+			// Comments table
+			sbAddForeignKeys = new StringBuilder();
+			sbAddForeignKeys.append("PRAGMA foreign_keys=off;");
+			sbAddForeignKeys.append("BEGIN TRANSACTION;");
+			sbAddForeignKeys.append("ALTER TABLE " + COMMENTS_TABLE + " RENAME TO " + COMMENTS_TABLE + "_old;");
+			sbAddForeignKeys.append(COMMENTS_TABLE_CREATE_SQL);
+			sbAddForeignKeys.append(COMMENTS_TABLE_CREATE_INDEX);
+			sbAddForeignKeys.append("INSERT INTO " + COMMENTS_TABLE + " SELECT * FROM " + COMMENTS_TABLE + "_old;");
+			sbAddForeignKeys.append("DROP TABLE " + COMMENTS_TABLE + "_old;");
+			sbAddForeignKeys.append("COMMIT;");
+			sbAddForeignKeys.append("PRAGMA foreign_keys=on;");
+			if (LOGGING)
+				Log.v(LOGTAG, "SQL: " + sbAddForeignKeys);
+			_sqliteDatabase.execSQL(sbAddForeignKeys.toString());
+
 
 		}
 	}

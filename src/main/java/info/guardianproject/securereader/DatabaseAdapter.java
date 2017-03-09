@@ -15,9 +15,11 @@ import net.sqlcipher.database.SQLiteDatabase;
 import net.sqlcipher.database.SQLiteDoneException;
 import net.sqlcipher.database.SQLiteTransactionListener;
 
+import android.app.Application;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
+import android.os.Environment;
 import android.provider.ContactsContract;
 import android.util.Log;
 
@@ -49,7 +51,7 @@ public class DatabaseAdapter
 		SQLiteDatabase.loadLibs(_context);
 		this.databaseHelper = new DatabaseHelper(cacheword, _context);
 		open();
-		//dumpDatabase();
+		//dumpDatabase(_context);
 	}
 
 	public void close()
@@ -60,6 +62,7 @@ public class DatabaseAdapter
 	public void open() throws SQLException
 	{
 		db = databaseHelper.getWritableDatabase();
+		db.execSQL("PRAGMA foreign_keys=ON;");
 	}
 
 	public boolean databaseReady()
@@ -316,16 +319,32 @@ public class DatabaseAdapter
 		return subscribed == 0;
 	}
 
+	/**
+	 * Delete the given feed. The delete will cascase, i.e. all items, media, tags and comments that
+	 * belong to the feed are also deleted.
+	 * @param feedDatabaseId The database id of the feed to delete.
+	 * @return true if the feed was deleted successfully.
+	 */
 	public boolean deleteFeed(long feedDatabaseId)
 	{
 		boolean returnValue = false;
 
 		try
 		{
-			deleteFeedItems(feedDatabaseId);
-
-			if (databaseReady())
+			if (databaseReady()) {
+				ArrayList<MediaContent> mediaContents = new ArrayList<>();
+				for (Item item : getFeedItems(feedDatabaseId, Integer.MAX_VALUE)) {
+					mediaContents.addAll(getItemMedia(item));
+				}
 				returnValue = db.delete(DatabaseHelper.FEEDS_TABLE, DatabaseHelper.FEEDS_TABLE_COLUMN_ID + "=?", new String[]{String.valueOf(feedDatabaseId)}) > 0;
+				if (returnValue) {
+					// Delete any media files we have downloaded
+					for (MediaContent mediaContent : mediaContents) {
+						//TODO - ugly to pass null here, fixme
+						SocialReader.getInstance(null).deleteMediaContentFileNow(mediaContent.getDatabaseId());
+					}
+				}
+			}
 		}
 		catch(Exception e)
 		{
@@ -342,7 +361,7 @@ public class DatabaseAdapter
 		String query = "select " + DatabaseHelper.ITEMS_TABLE_COLUMN_ID + ", " + DatabaseHelper.ITEMS_TABLE_PUBLISH_DATE + ", "
 				+ DatabaseHelper.ITEMS_TABLE_FAVORITE + ", " + DatabaseHelper.ITEMS_TABLE_SHARED + ", " + DatabaseHelper.ITEMS_TABLE_TITLE + ", " 
 				+ DatabaseHelper.ITEMS_TABLE_FEED_ID + " from " + DatabaseHelper.ITEMS_TABLE + " where " + DatabaseHelper.ITEMS_TABLE_PUBLISH_DATE + " < ?"
-				+ " and " + DatabaseHelper.ITEMS_TABLE_FAVORITE + " != ? and " + DatabaseHelper.ITEMS_TABLE_SHARED + " != ? order by " + DatabaseHelper.ITEMS_TABLE_PUBLISH_DATE + ";";
+				+ " and " + DatabaseHelper.ITEMS_TABLE_FAVORITE + " != ? and " + DatabaseHelper.ITEMS_TABLE_SHARED + " != ?;";
 
 		if (LOGGING)
 			Log.v(LOGTAG, query);
@@ -847,39 +866,35 @@ public class DatabaseAdapter
 		return feeds;
 	}
 
-	public void deleteFeedItems(long feedDatabaseId)
-	{
-		ArrayList<Item> feedItems = getFeedItems(feedDatabaseId, -1);
-		for (Item item : feedItems)
-		{
-			deleteItem(item.getDatabaseId());
-		}
-	}
-
+	/**
+	 * Delete the item with the given database id. This will cascase, i.e. delete all related media,
+	 * comments and tags.
+	 * @param itemDatabaseId The database id of the item to delete.
+	 * @return true if the item was deleted successfully.
+	 */
 	public boolean deleteItem(long itemDatabaseId)
 	{
-		deleteItemMedia(itemDatabaseId);
-		deleteItemTags(itemDatabaseId);
-		deleteItemComments(itemDatabaseId);
-		
 		boolean returnValue = false;
 
 		try
 		{
-			if (databaseReady())
+			if (databaseReady()) {
+				ArrayList<MediaContent> mediaContents = getItemMedia(itemDatabaseId);
 				returnValue = db.delete(DatabaseHelper.ITEMS_TABLE, DatabaseHelper.ITEMS_TABLE_COLUMN_ID + "=?", new String[]{String.valueOf(itemDatabaseId)}) > 0;
+				if (returnValue) {
+					// Delete any media files we have downloaded
+					for (MediaContent mediaContent : mediaContents) {
+						//TODO - ugly to pass null here, fixme
+						SocialReader.getInstance(null).deleteMediaContentFileNow(mediaContent.getDatabaseId());
+					}
+				}
+			}
 		}
-		catch (SQLException e)
+		catch (Exception e)
 		{
 			if (LOGGING)
 				e.printStackTrace();
 		}
-		catch(IllegalStateException e)
-		{
-			if (LOGGING)
-				e.printStackTrace();
-		}
-
 		return returnValue;
 	}
 
@@ -1640,64 +1655,6 @@ public class DatabaseAdapter
 		return feed;
 	}
 
-//	public long addItemWithLimit(Item item, int limit) {
-//		long returnValue = addItem(item);
-//
-//		deleteOverLimitItems(limit);
-//
-//		return returnValue;
-//	}
-	
-//	public long addItem(Item item)
-//	{
-//		long returnValue = -1;
-//
-//		try
-//		{
-//			ContentValues values = new ContentValues();
-//			values.put(DatabaseHelper.ITEMS_TABLE_AUTHOR, item.getAuthor());
-//			values.put(DatabaseHelper.ITEMS_TABLE_TITLE, item.getTitle());
-//			values.put(DatabaseHelper.ITEMS_TABLE_FEED_ID, item.getFeedId());
-//			values.put(DatabaseHelper.ITEMS_TABLE_CATEGORY, item.getCategory());
-//			values.put(DatabaseHelper.ITEMS_TABLE_COMMENTS_URL, item.getCommentsUrl());
-//			values.put(DatabaseHelper.ITEMS_TABLE_DESCRIPTION, item.getDescription());
-//			values.put(DatabaseHelper.ITEMS_TABLE_CONTENT_ENCODED, item.getContentEncoded());
-//			values.put(DatabaseHelper.ITEMS_TABLE_GUID, item.getGuid());
-//			values.put(DatabaseHelper.ITEMS_TABLE_LINK, item.getLink());
-//			values.put(DatabaseHelper.ITEMS_TABLE_SOURCE, item.getSource());
-//			values.put(DatabaseHelper.ITEMS_TABLE_SHARED, item.getShared());
-//			values.put(DatabaseHelper.ITEMS_TABLE_FAVORITE, item.getFavorite());
-//			values.put(DatabaseHelper.ITEMS_TABLE_REMOTE_POST_ID, item.getRemotePostId());
-//
-//			if (item.getPubDate() != null)
-//			{
-//				values.put(DatabaseHelper.ITEMS_TABLE_PUBLISH_DATE, dateFormat.format(item.getPubDate()));
-//			}
-//
-//			values.put(DatabaseHelper.ITEMS_TABLE_VIEWCOUNT, item.getViewCount());
-//
-//			if (databaseReady()) {
-//				returnValue = db.insert(DatabaseHelper.ITEMS_TABLE, null, values);
-//
-//				item.setDatabaseId(returnValue);
-//
-//				this.addOrUpdateItemMedia(item, item.getMediaContent());
-//				addOrUpdateItemTags(item);
-//			}
-//		}
-//		catch (SQLException e)
-//		{
-//			if (LOGGING)
-//				e.printStackTrace();
-//		}
-//		catch(IllegalStateException e)
-//		{
-//			if (LOGGING)
-//				e.printStackTrace();
-//		}
-//		return returnValue;
-//	}
-
 	public long addOrUpdateItem(Item item, int limit) {
 		long returnValue = -1;
 		if (databaseReady()) {
@@ -1757,97 +1714,12 @@ public class DatabaseAdapter
 		}
 		return returnValue;
 	}
-//
-//	public long addOrUpdateItem2(Item item, int limit)
-//	{
-//		long returnValue = -1;
-//		Cursor queryCursor = null;
-//
-//		try
-//		{
-//			if (item.getDatabaseId() == Item.DEFAULT_DATABASE_ID)
-//			{
-//				String query = "select " + DatabaseHelper.ITEMS_TABLE_COLUMN_ID + ", " + DatabaseHelper.ITEMS_TABLE_GUID + ", "
-//						+ DatabaseHelper.ITEMS_TABLE_FEED_ID + " from " + DatabaseHelper.ITEMS_TABLE + " where " + DatabaseHelper.ITEMS_TABLE_GUID + " = ?"
-//					    + " and " + DatabaseHelper.ITEMS_TABLE_FEED_ID + " = ?;";
-//
-//				if (LOGGING)
-//					Log.v(LOGTAG, query);
-//
-//				if (databaseReady()) {
-//					queryCursor = db.rawQuery(query, new String[] { item.getGuid(), String.valueOf(item.getFeedId()) });
-//
-//					if (LOGGING)
-//						Log.v(LOGTAG, "Got " + queryCursor.getCount() + " results");
-//
-//					if (queryCursor.getCount() == 0)
-//					{
-//						returnValue = addItem(item);
-//
-//						if (limit != -1) {
-//							this.deleteOverLimitItems(limit);
-//						}
-//					}
-//					else
-//					{
-//						queryCursor.moveToFirst();
-//
-//						returnValue = queryCursor.getLong(queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_COLUMN_ID));
-//
-//						item.setDatabaseId(returnValue);
-//						int columnCount = updateItem(item);
-//						if (columnCount != 1)
-//						{
-//							returnValue = -1;
-//						}
-//
-//					}
-//					queryCursor.close();
-//				}
-//			}
-//			else
-//			{
-//				int columnCount = updateItem(item);
-//
-//				if (columnCount != 1)
-//				{
-//					returnValue = -1;
-//				}
-//				else
-//				{
-//					returnValue = item.getDatabaseId();
-//				}
-//			}
-//		}
-//		catch (SQLException e)
-//		{
-//			if (LOGGING)
-//				e.printStackTrace();
-//		}
-//		catch(IllegalStateException e)
-//		{
-//			if (LOGGING)
-//				e.printStackTrace();
-//		}
-//		finally
-//		{
-//			if (queryCursor != null)
-//			{
-//				try
-//				{
-//					queryCursor.close();
-//				}
-//				catch(Exception e) {
-//					if (LOGGING)
-//						e.printStackTrace();
-//				}
-//			}
-//		}
-//
-//		return returnValue;
-//	}
 
-	public ArrayList<MediaContent> getItemMedia(Item item)
+	public ArrayList<MediaContent> getItemMedia(Item item) {
+		return getItemMedia(item.getDatabaseId());
+	}
+
+	public ArrayList<MediaContent> getItemMedia(long itemDatabaseId)
 	{
 		ArrayList<MediaContent> mediaContent = new ArrayList<MediaContent>();
 		
@@ -1873,7 +1745,7 @@ public class DatabaseAdapter
 			
 			try
 			{
-				queryCursor = db.rawQuery(query, new String[] {String.valueOf(item.getDatabaseId())});
+				queryCursor = db.rawQuery(query, new String[] {String.valueOf(itemDatabaseId)});
 	
 				int idColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEM_MEDIA_TABLE_COLUMN_ID);
 				int itemIdColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEM_MEDIA_ITEM_ID);
@@ -1948,12 +1820,7 @@ public class DatabaseAdapter
 				if (LOGGING)
 					Log.v(LOGTAG, "There is " + mediaContent.size() + " media for the item");
 			}
-			catch (SQLException e)
-			{
-				if (LOGGING)
-					e.printStackTrace();
-			}
-			catch(IllegalStateException e)
+			catch (Exception e)
 			{
 				if (LOGGING)
 					e.printStackTrace();
@@ -2120,7 +1987,7 @@ public class DatabaseAdapter
 			for (MediaContent itemMedia : itemMediaList)
 			{
 				itemMedia.setItemDatabaseId(item.getDatabaseId());
-				addOrUpdateItemMedia(item, itemMedia);
+				addOrUpdateItemMedia(itemMedia);
 				if (LOGGING)
 					Log.v(LOGTAG,"itemMedia added or updated: " + itemMedia.getDatabaseId());
 			}
@@ -2136,10 +2003,13 @@ public class DatabaseAdapter
 		}
 	}
 
-	public long addOrUpdateItemMedia(Item item, MediaContent itemMedia) {
+	public long addOrUpdateItemMedia(MediaContent itemMedia) {
 		long returnValue = -1;
 		if (databaseReady()) {
 			try {
+				if (itemMedia.getItemDatabaseId() == 0) {
+					throw new Exception("MEDIA CONTENT ITEM ID NOT SET!");
+				}
 				if (itemMedia.getDatabaseId() == MediaContent.DEFAULT_DATABASE_ID) {
 					// Get existing database ID
 					String query = "select " + DatabaseHelper.ITEM_MEDIA_TABLE_COLUMN_ID
@@ -2147,7 +2017,7 @@ public class DatabaseAdapter
 							+ " where " + DatabaseHelper.ITEM_MEDIA_ITEM_ID + " = ?"
 							+ " and " + DatabaseHelper.ITEM_MEDIA_URL + " = ?;";
  					try {
-						long id = DatabaseUtils.longForQuery(db, query, new String[]{String.valueOf(item.getDatabaseId()), itemMedia.getUrl()});
+						long id = DatabaseUtils.longForQuery(db, query, new String[]{String.valueOf(itemMedia.getItemDatabaseId()), itemMedia.getUrl()});
 						itemMedia.setDatabaseId(id);
 					} catch (SQLiteDoneException e) {
 						// Not found, this is an insert of a new row!
@@ -2155,7 +2025,7 @@ public class DatabaseAdapter
 				}
 
 				ContentValues values = new ContentValues();
-				values.put(DatabaseHelper.ITEM_MEDIA_ITEM_ID, item.getDatabaseId());
+				values.put(DatabaseHelper.ITEM_MEDIA_ITEM_ID, itemMedia.getItemDatabaseId());
 				values.put(DatabaseHelper.ITEM_MEDIA_URL, itemMedia.getUrl());
 				values.put(DatabaseHelper.ITEM_MEDIA_TYPE, itemMedia.getType());
 				values.put(DatabaseHelper.ITEM_MEDIA_MEDIUM, itemMedia.getMedium());
@@ -2186,108 +2056,9 @@ public class DatabaseAdapter
 		return returnValue;
 	}
 
-//	public long addOrUpdateItemMedia223(Item item, MediaContent itemMedia)
-//	{
-//		long returnValue = -1;
-//		// Check that we have a valid url
-//		if (itemMedia == null || itemMedia.getUrl() == null) {
-//			return returnValue; // Abort
-//		}
-//		if (itemMedia.getDatabaseId() == MediaContent.DEFAULT_DATABASE_ID)
-//		{
-//			String query = "select " + DatabaseHelper.ITEM_MEDIA_TABLE_COLUMN_ID + ", " + DatabaseHelper.ITEM_MEDIA_URL + ", "
-//					+ DatabaseHelper.ITEM_MEDIA_ITEM_ID + " from " + DatabaseHelper.ITEM_MEDIA_TABLE + " where " + DatabaseHelper.ITEM_MEDIA_URL + " =? and "
-//					+ DatabaseHelper.ITEM_MEDIA_ITEM_ID + " =?;";
-//
-//			if (LOGGING)
-//				Log.v(LOGTAG, query);
-//
-//			if (databaseReady()) {
-//				Cursor queryCursor = db.rawQuery(query, new String[] {itemMedia.getUrl(), String.valueOf(item.getDatabaseId())});
-//
-//				if (queryCursor.getCount() == 0)
-//				{
-//					queryCursor.close();
-//
-//					if (LOGGING)
-//						Log.v(LOGTAG,"Default database id and nothing related there so creating new");
-//
-//					ContentValues values = new ContentValues();
-//					values.put(DatabaseHelper.ITEM_MEDIA_ITEM_ID, item.getDatabaseId());
-//					values.put(DatabaseHelper.ITEM_MEDIA_URL, itemMedia.getUrl());
-//					values.put(DatabaseHelper.ITEM_MEDIA_TYPE, itemMedia.getType());
-//					values.put(DatabaseHelper.ITEM_MEDIA_MEDIUM, itemMedia.getMedium());
-//					values.put(DatabaseHelper.ITEM_MEDIA_HEIGHT, itemMedia.getHeight());
-//					values.put(DatabaseHelper.ITEM_MEDIA_WIDTH, itemMedia.getWidth());
-//					values.put(DatabaseHelper.ITEM_MEDIA_FILESIZE, itemMedia.getFileSize());
-//					values.put(DatabaseHelper.ITEM_MEDIA_DURATION, itemMedia.getDuration());
-//					values.put(DatabaseHelper.ITEM_MEDIA_DEFAULT, itemMedia.getIsDefault());
-//					values.put(DatabaseHelper.ITEM_MEDIA_EXPRESSION, itemMedia.getExpression());
-//					values.put(DatabaseHelper.ITEM_MEDIA_BITRATE, itemMedia.getBitrate());
-//					values.put(DatabaseHelper.ITEM_MEDIA_FRAMERATE, itemMedia.getFramerate());
-//					values.put(DatabaseHelper.ITEM_MEDIA_LANG, itemMedia.getLang());
-//					values.put(DatabaseHelper.ITEM_MEDIA_SAMPLE_RATE, itemMedia.getSampligRate());
-//
-//					if (itemMedia.getDownloaded()) {
-//						values.put(DatabaseHelper.ITEM_MEDIA_DOWNLOADED, 1);
-//					} else {
-//						values.put(DatabaseHelper.ITEM_MEDIA_DOWNLOADED, 0);
-//					}
-//
-//					try
-//					{
-//						returnValue = db.insert(DatabaseHelper.ITEM_MEDIA_TABLE, null, values);
-//						itemMedia.setDatabaseId(returnValue);
-//						if (LOGGING)
-//							Log.v(LOGTAG,"Created itemMedia: " + itemMedia.getDatabaseId());
-//
-//						//if (LOGGING)
-//						//Log.v(LOGTAG, "Added Item Media Content: " + returnValue + " item id: " + item.getDatabaseId());
-//					}
-//					catch (SQLException e)
-//					{
-//						if (LOGGING)
-//							e.printStackTrace();
-//					}
-//					catch(IllegalStateException e)
-//					{
-//						if (LOGGING)
-//							e.printStackTrace();
-//					}
-//
-//				} else {
-//					// else, it is already in the database, let's update the database id
-//
-//					int databaseIdColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEM_MEDIA_TABLE_COLUMN_ID);
-//
-//					if (queryCursor.moveToFirst())
-//					{
-//						long databaseId = queryCursor.getLong(databaseIdColumn);
-//						itemMedia.setDatabaseId(databaseId);
-//						returnValue = databaseId;
-//
-//					} else {
-//						if (LOGGING)
-//							Log.e(LOGTAG,"Couldn't move to first row");
-//					}
-//
-//					queryCursor.close();
-//
-//				}
-//			}
-//
-//		} else {
-//			int columnsUpdated = updateItemMedia(itemMedia);
-//			if (columnsUpdated == 1)
-//			{
-//				returnValue = itemMedia.getDatabaseId();
-//			}
-//		}
-//		return returnValue;
-//	}
-
 	public void addOrUpdateItemComments(Item item, ArrayList<Comment> itemCommentList)
 	{
+		//TODO refactoring
 		if (LOGGING)
 			Log.v(LOGTAG,"addOrUpdateItemComments adding " + itemCommentList.size());
 		
@@ -2624,58 +2395,7 @@ public class DatabaseAdapter
 
 		return returnValue;
 	}
-	
-	public int updateItemMedia(MediaContent itemMedia) {
-		int returnValue = -1;
-		
-		ContentValues values = new ContentValues();
-		values.put(DatabaseHelper.ITEM_MEDIA_ITEM_ID, itemMedia.getItemDatabaseId());
-		values.put(DatabaseHelper.ITEM_MEDIA_URL, itemMedia.getUrl());
-		values.put(DatabaseHelper.ITEM_MEDIA_TYPE, itemMedia.getType());
-		values.put(DatabaseHelper.ITEM_MEDIA_MEDIUM, itemMedia.getMedium());
-		values.put(DatabaseHelper.ITEM_MEDIA_HEIGHT, itemMedia.getHeight());
-		values.put(DatabaseHelper.ITEM_MEDIA_WIDTH, itemMedia.getWidth());
-		values.put(DatabaseHelper.ITEM_MEDIA_FILESIZE, itemMedia.getFileSize());
-		values.put(DatabaseHelper.ITEM_MEDIA_DURATION, itemMedia.getDuration());
-		values.put(DatabaseHelper.ITEM_MEDIA_DEFAULT, itemMedia.getIsDefault());
-		values.put(DatabaseHelper.ITEM_MEDIA_EXPRESSION, itemMedia.getExpression());
-		values.put(DatabaseHelper.ITEM_MEDIA_BITRATE, itemMedia.getBitrate());
-		values.put(DatabaseHelper.ITEM_MEDIA_FRAMERATE, itemMedia.getFramerate());
-		values.put(DatabaseHelper.ITEM_MEDIA_LANG, itemMedia.getLang());
-		values.put(DatabaseHelper.ITEM_MEDIA_SAMPLE_RATE, itemMedia.getSampligRate());
 
-		if (itemMedia.getDownloaded()) {
-			if (LOGGING) 
-				Log.v(LOGTAG, "itemMedia Downlaoded is true");
-			values.put(DatabaseHelper.ITEM_MEDIA_DOWNLOADED, 1);
-		} else {
-			if (LOGGING)
-				Log.v(LOGTAG, "itemMedia Downlaoded is false");
-			values.put(DatabaseHelper.ITEM_MEDIA_DOWNLOADED, 0);
-		}
-		
-		if (databaseReady()) {
-			try
-			{
-				returnValue = db.update(DatabaseHelper.ITEM_MEDIA_TABLE, values, DatabaseHelper.ITEM_MEDIA_TABLE_COLUMN_ID + "=?", new String[] { String.valueOf(itemMedia.getDatabaseId()) });
-				if (LOGGING)
-					Log.v(LOGTAG, "updateItemMedia database query returnValue: " + returnValue);
-			}
-			catch (SQLException e)
-			{
-				if (LOGGING)
-					e.printStackTrace();
-			}	
-			catch(IllegalStateException e)
-			{
-				if (LOGGING)
-					e.printStackTrace();
-			}
-
-		}
-		return returnValue;
-	}	
-	
 	public ArrayList<Item> getFeedItemsWithMediaTags(Feed feed, ArrayList<String> tags, String mediaMimeType, boolean randomize, int limit) {
 		
 		// If no specific feed is given we search through all subscribed ones!
@@ -2908,22 +2628,23 @@ public class DatabaseAdapter
 	}
 
 
-//	public void dumpDatabase()
-//	{
-//		try {
-//			if (databaseReady()) {
-//				db.rawExecSQL("ATTACH DATABASE '/mnt/sdcard/dump.sqlite' AS plaintext KEY '';");
-//				db.rawExecSQL("SELECT sqlcipher_export('plaintext');");
-//				db.rawExecSQL("DETACH DATABASE plaintext;");
-//			}
-//		} catch (SQLException e) {
-//			if (LOGGING) 
-//				e.printStackTrace();
-//		} 		
-//		finally
-//		{
-//		}
-//	}
+	public void dumpDatabase(Context context)
+	{
+		try {
+			if (databaseReady()) {
+				String path = context.getFilesDir().getAbsolutePath();
+				db.rawExecSQL("ATTACH DATABASE '" + path + "/dump.sqlite' AS plaintext KEY '';");
+				db.rawExecSQL("SELECT sqlcipher_export('plaintext');");
+				db.rawExecSQL("DETACH DATABASE plaintext;");
+			}
+		} catch (SQLException e) {
+			if (LOGGING)
+				e.printStackTrace();
+		}
+		finally
+		{
+		}
+	}
 
 	public ArrayList<Item> getItemsWithMediaNotDownloaded(int limit) {
 		ArrayList<Item> items = new ArrayList<Item>();
@@ -3195,16 +2916,11 @@ public class DatabaseAdapter
 					db.insert(DatabaseHelper.ITEM_TAGS_TABLE, null, values);
 				}
 			}
-			catch (SQLException e)
+			catch (Exception e)
 			{
 				if (LOGGING)
 					e.printStackTrace();
 			}		
-			catch(IllegalStateException e)
-			{
-				if (LOGGING)
-					e.printStackTrace();
-			}
 		}
 	}
 	
@@ -3230,63 +2946,7 @@ public class DatabaseAdapter
 	public void deleteItemTags(Item item) {
 		deleteItemTags(item.getDatabaseId());
 	}
-	
-	
-	public void deleteItemMedia(Item item)
-	{
-		deleteItemMedia(item.getDatabaseId());
-	}
 
-	public void deleteItemMedia(long itemId)
-	{
-		if (databaseReady()) {
-			try
-			{
-				//ArrayList<String> itemMediaFiles = getItemMediaFiles(itemId);
-				long returnValue = db.delete(DatabaseHelper.ITEM_MEDIA_TABLE, DatabaseHelper.ITEM_MEDIA_ITEM_ID + "=?", new String[] { String.valueOf(itemId) });
-			}
-			catch (SQLException e)
-			{
-				if (LOGGING) 
-					e.printStackTrace();
-			}
-			catch(IllegalStateException e)
-			{
-				if (LOGGING)
-					e.printStackTrace();
-			}
-		}
-	}
-
-	public void deleteItemComments(Item item) {
-		deleteItemComments(item.getDatabaseId());
-	}
-	
-	public void deleteItemComments(long itemId) {
-		if (databaseReady()) {
-			try {
-				long returnValue = db.delete(DatabaseHelper.COMMENTS_TABLE, DatabaseHelper.COMMENTS_TABLE_ITEM_ID + "=?", new String[] { String.valueOf(itemId) });
-			} catch (SQLException e) {
-				if (LOGGING)
-					e.printStackTrace();
-			}
-			catch(IllegalStateException e)
-			{
-				if (LOGGING)
-					e.printStackTrace();
-			}
-
-		}
-	}
-	
-	/*
-	public ArrayList<String> getItemMediaFiles(long itemId) {
-		if (databaseReady()) {
-
-		}
-	}
-	*/
-	
 	private long deleteOldItemMedia(Item item, ArrayList<MediaContent> itemMediaList)
 	{
 		long numDeleted = 0;

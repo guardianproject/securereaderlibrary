@@ -28,7 +28,8 @@ public class FeedFetcher extends AsyncTask<Feed, Integer, Feed>
 
 	public interface FeedFetchedCallback
 	{
-		public void feedFetched(Feed _feed);
+		void feedFetched(Feed _feed);
+		void feedError(Feed _feed);
 	}
 
 	public FeedFetcher(SocialReader _socialReader)

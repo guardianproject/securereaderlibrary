@@ -12,6 +12,7 @@ package info.guardianproject.securereader;
 //import info.guardianproject.bigbuffalo.adapters.DownloadsAdapter;
 import cz.msebera.android.httpclient.client.HttpClient;
 import cz.msebera.android.httpclient.impl.client.LaxRedirectStrategy;
+import cz.msebera.android.httpclient.impl.conn.PoolingHttpClientConnectionManager;
 import info.guardianproject.cacheword.CacheWordHandler;
 import info.guardianproject.cacheword.Constants;
 import info.guardianproject.cacheword.ICacheWordSubscriber;
@@ -26,7 +27,7 @@ import info.guardianproject.securereader.HTMLRSSFeedFinder.RSSFeed;
 import info.guardianproject.securereader.MediaDownloader.MediaDownloaderCallback;
 import info.guardianproject.securereader.Settings.ProxyType;
 import info.guardianproject.securereader.Settings.UiLanguage;
-import info.guardianproject.securereader.SyncServiceFeedFetcher.SyncServiceFeedFetchedCallback;
+import info.guardianproject.securereader.SyncTaskFeedFetcher.SyncServiceFeedFetchedCallback;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -38,13 +39,9 @@ import java.io.InputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.net.URLEncoder;
-import java.security.GeneralSecurityException;
-import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -57,16 +54,12 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 import android.annotation.SuppressLint;
-import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.BroadcastReceiver;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.ServiceConnection;
 import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.graphics.BitmapFactory;
 import android.net.ConnectivityManager;
@@ -75,7 +68,6 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
 import android.os.Handler;
-import android.os.IBinder;
 import android.os.Message;
 import android.os.StatFs;
 import android.support.v4.content.LocalBroadcastManager;
@@ -89,28 +81,14 @@ import com.tinymission.rss.MediaContent;
 import com.tinymission.rss.MediaContent.MediaContentType;
 import com.tinymission.rss.Comment;
 
-import org.w3c.dom.Attr;
-import org.w3c.dom.CDATASection;
-import org.w3c.dom.DOMConfiguration;
-import org.w3c.dom.DOMException;
-import org.w3c.dom.DOMImplementation;
 import org.w3c.dom.Document;
-import org.w3c.dom.DocumentFragment;
-import org.w3c.dom.DocumentType;
-import org.w3c.dom.Element;
-import org.w3c.dom.EntityReference;
-import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
-import org.w3c.dom.ProcessingInstruction;
-import org.w3c.dom.Text;
-import org.w3c.dom.UserDataHandler;
 import org.xml.sax.InputSource;
 
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.transform.OutputKeys;
 import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
@@ -205,7 +183,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	public final String opmlUrl;
 	public String[] feedsWithComments;
 	
-	public static final int TIMER_PERIOD = 30000;  // 30 seconds 
+	public static final int TIMER_PERIOD = 30000;  //TODO - remove this crazyness! 30 seconds
 	
 	public final int itemLimit;
 	public final int mediaCacheSize;
@@ -222,7 +200,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	CacheWordHandler cacheWord;
 	public SecureSettings ssettings;
 	Settings settings;
-	SyncServiceConnection syncServiceConnection;
+	//SyncServiceConnection syncServiceConnection;
 	SocialReaderLockListener lockListener;
 	SocialReaderFeedPreprocessor feedPreprocessor;
 
@@ -414,8 +392,8 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
     					Log.v(LOGTAG, "App in background and sync frequency set to in background OR App in foreground");
     				
     	        	checkOPML();
-    				backgroundSyncSubscribedFeeds();
-    				checkMediaDownloadQueue();
+    				//backgroundSyncSubscribedFeeds();
+    				//checkMediaDownloadQueue();
     			} else {
     				if (LOGGING)
     					Log.v(LOGTAG, "App in background and sync frequency not set to background");
@@ -430,28 +408,12 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	TimerHandler timerHandler = new TimerHandler();
 	
     private SyncService syncService;
-    private SyncService.SyncServiceListener syncServiceListener;
 
     public SyncService getSyncService()
     {
     	return syncService;
     }
     
-    public void setSyncServiceListener(SyncService.SyncServiceListener listener) {
-    	syncServiceListener = listener;
-
-    	if (syncService != null) {
-    		if (LOGGING)
-    			Log.v(LOGTAG,"Setting SyncServiceListener");
-    		syncService.setSyncServiceListener(syncServiceListener);
-    	} else {
-    		if (LOGGING) {
-    			Log.v(LOGTAG,"Can't set SyncServiceListener, syncService is null");
-    			Log.v(LOGTAG, "No problem, we'll add it later, when we bind");
-    		}
-    	}
-    }
-
     public void setLockListener(SocialReaderLockListener lockListener)
     {
     	this.lockListener = lockListener;
@@ -467,52 +429,52 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		this.feedPreprocessor = feedPreprocessor;
 	}
 
-	class SyncServiceConnection implements ServiceConnection {
-
-		public boolean isConnected = false;
-
-        @Override
-        public void onServiceConnected(ComponentName className, IBinder service) {
-            // This is called when the connection with the service has been
-            // established, giving us the service object we can use to
-            // interact with the service.  Because we have bound to a explicit
-            // service that we know is running in our own process, we can
-            // cast its IBinder to a concrete class and directly access it.
-        	syncService = ((SyncService.LocalBinder)service).getService();
-
-        	if (LOGGING)
-        		Log.v(LOGTAG,"Connected to SyncService");
-
-        	// Add Listener?
-        	if (syncServiceListener != null) {
-        		syncService.setSyncServiceListener(syncServiceListener);
-        		if (LOGGING)
-        			Log.v(LOGTAG,"added syncServiceListener");
-        	}
-
-    		// Back to the front, check the syncing
-    		if (settings.syncFrequency() != Settings.SyncFrequency.Manual) {
-    			backgroundSyncSubscribedFeeds();
-    		}
-
-    		isConnected = true;
-        }
-
-        @Override
-        public void onServiceDisconnected(ComponentName className) {
-            // This is called when the connection with the service has been
-            // unexpectedly disconnected -- that is, its process crashed.
-            // Because it is running in our same process, we should never
-            // see this happen.
-
-        	syncService = null;
-
-        	if (LOGGING)
-        		Log.v(LOGTAG,"Disconnected from SyncService");
-
-        	isConnected = false;
-        }
-    };
+//	class SyncServiceConnection implements ServiceConnection {
+//
+//		public boolean isConnected = false;
+//
+//        @Override
+//        public void onServiceConnected(ComponentName className, IBinder service) {
+//            // This is called when the connection with the service has been
+//            // established, giving us the service object we can use to
+//            // interact with the service.  Because we have bound to a explicit
+//            // service that we know is running in our own process, we can
+//            // cast its IBinder to a concrete class and directly access it.
+//        	syncService = ((SyncService.LocalBinder)service).getService();
+//
+//        	if (LOGGING)
+//        		Log.v(LOGTAG,"Connected to SyncService");
+//
+//        	// Add Listener?
+//        	if (syncServiceListener != null) {
+//        		syncService.setSyncServiceListener(syncServiceListener);
+//        		if (LOGGING)
+//        			Log.v(LOGTAG,"added syncServiceListener");
+//        	}
+//
+//    		// Back to the front, check the syncing
+//    		if (settings.syncFrequency() != Settings.SyncFrequency.Manual) {
+//    			backgroundSyncSubscribedFeeds();
+//    		}
+//
+//    		isConnected = true;
+//        }
+//
+//        @Override
+//        public void onServiceDisconnected(ComponentName className) {
+//            // This is called when the connection with the service has been
+//            // unexpectedly disconnected -- that is, its process crashed.
+//            // Because it is running in our same process, we should never
+//            // see this happen.
+//
+//        	syncService = null;
+//
+//        	if (LOGGING)
+//        		Log.v(LOGTAG,"Disconnected from SyncService");
+//
+//        	isConnected = false;
+//        }
+//    };
 
 	private boolean initialized = false;
 	public void initialize() {
@@ -530,11 +492,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 
 			initHttpClient(applicationContext);
 
-			syncServiceConnection = new SyncServiceConnection();
-
-            //Using startService() overrides the default service lifetime that is managed by bindService(Intent, ServiceConnection, int): it requires the service to remain running until stopService(Intent) is called, regardless of whether any clients are connected to it. Note that calls to startService() are not nesting: no matter how many times you call startService(), a single call to stopService(Intent) will stop it.
-            applicationContext.startService(new Intent(applicationContext, SyncService.class));
-            applicationContext.bindService(new Intent(applicationContext, SyncService.class), syncServiceConnection, Context.BIND_AUTO_CREATE);
+			syncService = SyncService.getInstance(applicationContext);
 
             periodicTask = new TimerTask() {
                 @Override
@@ -556,9 +514,9 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	}
 
 	public void uninitialize() {
-		if (syncServiceConnection != null && syncServiceConnection.isConnected) {
-			applicationContext.unbindService(syncServiceConnection);
-			syncServiceConnection.isConnected = false;
+		if (syncService != null) {
+			syncService.cancelAll();
+			syncService = null;
 		}
 
 		// If we aren't going to do any background syncing, stop the service
@@ -1255,6 +1213,14 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		}
 	}
 
+	public Feed getFeedById(long feedDatabaseId) {
+		if (databaseAdapter != null && databaseAdapter.databaseReady()) {
+			return databaseAdapter.getFeedById(feedDatabaseId);
+		} else {
+			return null;
+		}
+	}
+
 	/*
 	 * Utilizes the SyncService to Requests feed and feed items to be pulled from the network
 	 */
@@ -1333,6 +1299,10 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 							else if (LOGGING)
 								Log.e(LOGTAG,"feedsWithComments is null!!!");
 						}
+
+						@Override
+						public void feedFetchError(Feed _feed) {
+						}
 					});
 				} else if (isOnline() != ONLINE) {
 					if (LOGGING)
@@ -1347,7 +1317,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 			if (isOnline() == ONLINE && syncService != null && talkItem != null && !TextUtils.isEmpty(talkItem.getCommentsUrl())) {
 				if (LOGGING)
 					Log.v(LOGTAG,"Adding talkItem to syncService");
-				syncService.addCommentsSyncTask(talkItem);
+				syncService.addCommentsSyncTask(talkItem, null);
 			} else if (LOGGING) {
 				Log.v(LOGTAG,"Unable to add talkItem to syncService");
 			}
@@ -1389,7 +1359,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 				settings.syncMode() != Settings.SyncMode.BitWise
 				&& syncService != null) {
 				
-			syncService.clearSyncList();
+			syncService.cancelAll();
 			backgroundSyncSubscribedFeeds();
 		}
 		
@@ -1453,71 +1423,43 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		}
 		
 	}
-	
+
+	boolean _manualSyncInProgress = false;
 	public boolean manualSyncInProgress() {
-		return requestPending;
+		return _manualSyncInProgress;
 	}
 
-	// Request all of the feeds one at a time in the foreground
-	int requestAllFeedsCurrentFeedIndex = 0;
-	Feed compositeFeed = new Feed();
-
-	boolean requestPending = false;
-	FeedFetcher.FeedFetchedCallback finalCallback = null;
-
-	public void manualSyncSubscribedFeeds(FeedFetcher.FeedFetchedCallback _finalCallback)
+	public void manualSyncSubscribedFeeds(final FeedFetcher.FeedFetchedCallback _finalCallback)
 	{
-		finalCallback = _finalCallback;
-
-		if (!requestPending)
+		if (!_manualSyncInProgress)
 		{
-			requestPending = true;
-
 			final ArrayList<Feed> feeds = getSubscribedFeedsList();
-
-			requestAllFeedsCurrentFeedIndex = 0;
-			compositeFeed.clearItems();
-
-			if (LOGGING)
-				Log.v(LOGTAG, "requestAllFeedsCurrentFeedIndex:" + requestAllFeedsCurrentFeedIndex);
-
 			if (feeds.size() > 0)
 			{
-				FeedFetcher.FeedFetchedCallback ffcallback = new FeedFetcher.FeedFetchedCallback()
-				{
+				_manualSyncInProgress = true;
+				SyncServiceFeedFetchedCallback callback = new SyncServiceFeedFetchedCallback() {
 					@Override
-					public void feedFetched(Feed _feed)
-					{
+					public void feedFetched(Feed _feed) {
 						if (LOGGING)
-							Log.v(LOGTAG, "Done Fetching: " + _feed.getFeedURL());
-
-						compositeFeed.addItems(_feed.getItems());
-
-						if (requestAllFeedsCurrentFeedIndex < feeds.size() - 1)
-						{
-							requestAllFeedsCurrentFeedIndex++;
-							if (LOGGING)
-								Log.v(LOGTAG, "requestAllFeedsCurrentFeedIndex:" + requestAllFeedsCurrentFeedIndex);
-							foregroundRequestFeedNetwork(feeds.get(requestAllFeedsCurrentFeedIndex), this);
+							Log.v(LOGTAG, "Manual resync done!");
+						_manualSyncInProgress = false;
+						if (_finalCallback != null) {
+							_finalCallback.feedFetched(_feed);
 						}
-						else
-						{
-							if (LOGGING)
-								Log.v(LOGTAG, "Feed Fetcher Done!");
-							requestPending = false;
-							if (finalCallback != null) {
-								finalCallback.feedFetched(compositeFeed);
-							}
+					}
+
+					@Override
+					public void feedFetchError(Feed _feed) {
+						if (LOGGING)
+							Log.v(LOGTAG, "Manual resync failed!");
+						_manualSyncInProgress = false;
+						if (_finalCallback != null) {
+							_finalCallback.feedError(_feed);
 						}
 					}
 				};
-
-				if (LOGGING)
-					Log.v(LOGTAG, "requestAllFeedsCurrentFeedIndex:" + requestAllFeedsCurrentFeedIndex);
-				foregroundRequestFeedNetwork(feeds.get(requestAllFeedsCurrentFeedIndex), ffcallback);
+				syncService.addFeedsSyncTask(feeds, callback);
 			}
-			if (LOGGING)
-				Log.v(LOGTAG, "feeds.size is " + feeds.size());
 		}
 	}
 	
@@ -1529,36 +1471,37 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	 */
 	public void manualSyncFeed(Feed feed, FeedFetcher.FeedFetchedCallback callback)
 	{
-		if (isOnline() == ONLINE)
-		{
-			// Adding an intermediate callback
-			// Essentially, I never want it directly from the network, I want to
-			// re-request it from the database
-
-			final FeedFetcher.FeedFetchedCallback finalcallback = callback;
-			FeedFetcher.FeedFetchedCallback intermediateCallback = callback;
-
-			if (databaseAdapter != null && databaseAdapter.databaseReady())
-			{
-				intermediateCallback = new FeedFetcher.FeedFetchedCallback()
-				{
-					@Override
-					public void feedFetched(Feed _feed)
-					{
-						if (finalcallback != null) {
-							Feed updatedFeed = getFeed(_feed);
-							if (appStatus == SocialReader.APP_IN_FOREGROUND) {
-								finalcallback.feedFetched(updatedFeed);
-							}
-						}
-					}
-				};
-			}
-
-			if (LOGGING)
-				Log.v(LOGTAG, "Refreshing Feed from Network");
-			foregroundRequestFeedNetwork(feed, intermediateCallback);
-		}
+		//TODO refacoring
+//		if (isOnline() == ONLINE)
+//		{
+//			// Adding an intermediate callback
+//			// Essentially, I never want it directly from the network, I want to
+//			// re-request it from the database
+//
+//			final FeedFetcher.FeedFetchedCallback finalcallback = callback;
+//			FeedFetcher.FeedFetchedCallback intermediateCallback = callback;
+//
+//			if (databaseAdapter != null && databaseAdapter.databaseReady())
+//			{
+//				intermediateCallback = new FeedFetcher.FeedFetchedCallback()
+//				{
+//					@Override
+//					public void feedFetched(Feed _feed)
+//					{
+//						if (finalcallback != null) {
+//							Feed updatedFeed = getFeed(_feed);
+//							if (appStatus == SocialReader.APP_IN_FOREGROUND) {
+//								finalcallback.feedFetched(updatedFeed);
+//							}
+//						}
+//					}
+//				};
+//			}
+//
+//			if (LOGGING)
+//				Log.v(LOGTAG, "Refreshing Feed from Network");
+//			foregroundRequestFeedNetwork(feed, intermediateCallback);
+//		}
 	}
 
 	/*
@@ -2092,17 +2035,17 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	public void setMediaContentDownloaded(MediaContent mc) {
 		mc.setDownloaded(true);
 		if (databaseAdapter != null && databaseAdapter.databaseReady()) {
-			databaseAdapter.updateItemMedia(mc);
-			//databaseAdapter.deleteOverLimitMedia(mediaCacheSizeLimitInBytes, this);
+			databaseAdapter.addOrUpdateItemMedia(mc);
+		} else {
+			if (LOGGING)
+				Log.v(LOGTAG, "Can't update database, not ready");
 		}
 	}
 	
 	public void unsetMediaContentDownloaded(MediaContent mc) {
-		if (LOGGING)
-			Log.v(LOGTAG, "unsetMediaContentDownloaded");
 		mc.setDownloaded(false);
 		if (databaseAdapter != null && databaseAdapter.databaseReady()) {
-			databaseAdapter.updateItemMedia(mc);
+			databaseAdapter.addOrUpdateItemMedia(mc);
 		} else {
 			if (LOGGING)	
 				Log.v(LOGTAG, "Can't update database, not ready");
@@ -2125,62 +2068,13 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 
 	/*
 	 * Updates the feed data matching the feed object in the database. This
-	 * ignores any items that are referenced in the feed object
-	 *
-	 * Returns null if update failed
-	 */
-	public Feed setFeedData(Feed feed)
-	{
-		if (databaseAdapter != null && databaseAdapter.databaseReady())
-		{
-			// First see if the feed has a valid database ID, if not, add a stub
-			// and set the id
-			if (feed.getDatabaseId() == Feed.DEFAULT_DATABASE_ID)
-			{
-				feed.setDatabaseId(databaseAdapter.addFeedIfNotExisting(feed.getTitle(), feed.getFeedURL()));
-			}
-
-			// Now update the record in the database, this fills more of the
-			// data out
-			int result = databaseAdapter.updateFeed(feed);
-			if (LOGGING)
-				Log.v(LOGTAG, "setFeedData: " + result);
-
-			if (result == 1)
-			{
-				// Return the feed as it may have a new database id
-				return feed;
-			}
-			else
-			{
-				return null;
-			}
-		}
-		else
-		{
-			if (LOGGING)
-				Log.e(LOGTAG,"Database not ready: setFeedData");
-			return null;
-		}
-	}
-
-	/*
-	 * Updates the feed data matching the feed object in the database. This
 	 * includes any items that are referenced in the feed object.
 	 */
 	public void setFeedAndItemData(Feed feed)
 	{
 		if (databaseAdapter != null && databaseAdapter.databaseReady())
 		{
-			setFeedData(feed);
-
-			for (Item item : feed.getItems())
-			{
-				// Make sure the feed ID is correct and the source is set correctly
-				item.setFeedId(feed.getDatabaseId());
-				item.setSource(feed.getTitle());
-				setItemData(item);
-			}
+			databaseAdapter.addOrUpdateFeedAndItems(feed, itemLimit);
 		}
 		else
 		{
@@ -2215,16 +2109,8 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	public void backgroundDownloadItemMedia(Item item)
 	{
 		if (settings.syncMode() != Settings.SyncMode.BitWise) {
-			for (MediaContent contentItem : item.getMediaContent())
-			{
-				if (syncService != null) {
-					if (LOGGING)
-						Log.v(LOGTAG,"syncService != null");
-					syncService.addMediaContentSyncTask(contentItem);
-				} else {
-					if (LOGGING)
-						Log.v(LOGTAG,"syncService is null!");
-				}
+			for (MediaContent contentItem : item.getMediaContent()) {
+				syncService.addMediaContentSyncTask(contentItem);
 			}
 		}
 	}
@@ -2242,8 +2128,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		{
 			
 			Feed newFeed = new Feed("", url);
-			newFeed.setDatabaseId(databaseAdapter.addFeedIfNotExisting("", url));
-
+			databaseAdapter.addOrUpdateFeed(newFeed);
 			if (callback != null)
 			{
 				foregroundRequestFeedNetwork(newFeed,callback);
@@ -2747,7 +2632,15 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 			return false;
 		}
 	}
-	
+
+	public void deleteMediaContentFileNow(final long mediaContentDatabaseId) {
+		final File possibleFile = new File(getFileSystemDir(), MEDIA_CONTENT_FILE_PREFIX + mediaContentDatabaseId);
+		if (possibleFile.exists())
+		{
+			boolean ignored = possibleFile.delete();
+		}
+	}
+
 	public void deleteMediaContentFile(final int mediaContentDatabaseId) {
 		final File possibleFile = new File(getFileSystemDir(), MEDIA_CONTENT_FILE_PREFIX + mediaContentDatabaseId);
 		if (possibleFile.exists())
@@ -3054,7 +2947,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 				mediaContent.setWidth(o.outWidth);
 				mediaContent.setHeight(o.outHeight);
 				if (databaseAdapter != null && databaseAdapter.databaseReady())
-					databaseAdapter.updateItemMedia(mediaContent);
+					databaseAdapter.addOrUpdateItemMedia(mediaContent); // TODO refactoring remove this here!
 			}
 		}
 		catch (FileNotFoundException e)
@@ -3100,7 +2993,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 			{
 				Feed dbFeed = databaseAdapter.getFeedItems(_feed, DEFAULT_NUM_FEED_ITEMS);			
 				for (Item item : dbFeed.getItems()) {
-					syncService.addCommentsSyncTask(item);
+					syncService.addCommentsSyncTask(item, null);
 				}
 			}
 			else
