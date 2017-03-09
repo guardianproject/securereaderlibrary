@@ -374,12 +374,12 @@ public class SyncService {
 
 		@Override
 		protected <T> RunnableFuture<T> newTaskFor(Callable<T> callable) {
-			return new PrioritizedListenableFutureTask<T>(callable, ((SyncTask)callable).priority);
+			return new PrioritizedListenableFutureTask<>(callable, ((SyncTask) callable).priority);
 		}
 
 		@Override
 		protected <T> RunnableFuture<T> newTaskFor(Runnable runnable, T value) {
-			return new PrioritizedListenableFutureTask<T>(runnable, value, ((SyncTask)runnable).priority);
+			return new PrioritizedListenableFutureTask<>(runnable, value, ((SyncTask) runnable).priority);
 		}
 
 		@Override
@@ -429,20 +429,28 @@ public class SyncService {
 			super(new Callable<V>() {
 				@Override
 				public V call() throws Exception {
-					final SyncTask syncTask = (SyncTask) callable;
-					long now = System.currentTimeMillis();
-					final long queueDuration = now - syncTask.startTime;
-					syncTask.status = SyncTask.SyncTaskStatus.STARTED;
-					syncTask.startTime = now;
-					if (LOGGING)
-						Log.d(LOGTAG, "Task {" + syncTask + "} spent " + queueDuration + "ms in queue");
-					V result = callable.call();
-					now = System.currentTimeMillis();
-					final long runDuration = now - syncTask.startTime;
-					if (LOGGING)
-						Log.d(LOGTAG, "Task {" + syncTask + "} spent " + runDuration + "ms running");
-					syncTask.status = SyncTask.SyncTaskStatus.FINISHED;
-					return result;
+					String threadName = Thread.currentThread().getName();
+					Thread.currentThread().setName(threadName + "-Processing");
+					try {
+						final SyncTask syncTask = (SyncTask) callable;
+						long now = System.currentTimeMillis();
+						final long queueDuration = now - syncTask.startTime;
+						syncTask.status = SyncTask.SyncTaskStatus.STARTED;
+						syncTask.startTime = now;
+						if (LOGGING)
+							Log.d(LOGTAG, "Task {" + syncTask + "} spent " + queueDuration + "ms in queue");
+						V result = callable.call();
+						now = System.currentTimeMillis();
+						final long runDuration = now - syncTask.startTime;
+						if (LOGGING)
+							Log.d(LOGTAG, "Task {" + syncTask + "} spent " + runDuration + "ms running");
+						syncTask.status = SyncTask.SyncTaskStatus.FINISHED;
+						Thread.currentThread().setName(threadName);
+						return result;
+					} catch (Exception e) {
+						Thread.currentThread().setName(threadName);
+						throw e;
+					}
 				}
 			});
 			this.callable = callable;
