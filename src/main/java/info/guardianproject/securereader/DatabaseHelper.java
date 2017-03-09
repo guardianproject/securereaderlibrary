@@ -37,6 +37,7 @@ public class DatabaseHelper extends SQLCipherOpenHelper
 			+ FEEDS_TABLE_NETWORK_PULL_DATE + " text null," + FEEDS_TABLE_TITLE + " text not null," + FEEDS_TABLE_FEED_URL + " text not null,"
 			+ FEEDS_TABLE_LINK + " text null, " + FEEDS_TABLE_DESCRIPTION + " text null," + FEEDS_TABLE_PUBLISH_DATE + " text null,"
 			+ FEEDS_TABLE_LAST_BUILD_DATE + " text null," + FEEDS_TABLE_LANGUAGE + " text null," + FEEDS_TABLE_SUBSCRIBED + " integer default 0, " + FEEDS_TABLE_STATUS + " integer default 0, " + FEEDS_TABLE_CATEGORY + " text null);";
+	public static final String FEEDS_TABLE_CREATE_INDEX = "CREATE UNIQUE INDEX url_index ON " + FEEDS_TABLE + " (" + FEEDS_TABLE_FEED_URL + ");";
 
 	public static final String ITEMS_TABLE = "items";
 	public static final String ITEMS_TABLE_COLUMN_ID = "item_id";
@@ -64,8 +65,9 @@ public class DatabaseHelper extends SQLCipherOpenHelper
 			+ ITEMS_TABLE_AUTHOR + " text null, " + ITEMS_TABLE_COMMENTS_URL + " text null, " + ITEMS_TABLE_SOURCE + " text null, " + ITEMS_TABLE_CATEGORY
 			+ " text null, " + ITEMS_TABLE_FAVORITE + " boolean default 0, " + ITEMS_TABLE_SHARED + " boolean default 0, " + ITEMS_TABLE_VIEWCOUNT + " integer default 0, "
 			+ ITEMS_TABLE_REMOTE_POST_ID + " integer default -1"	+ ");";
-	
+
 	public static final String ITEMS_TABLE_CREATE_INDEX = "create index item_publish_date_index on " + ITEMS_TABLE + " (" + ITEMS_TABLE_PUBLISH_DATE + ");";
+	public static final String ITEMS_TABLE_CREATE_INDEX2 = "CREATE UNIQUE INDEX feed_guid_index ON " + ITEMS_TABLE + " (" + ITEMS_TABLE_FEED_ID + "," + ITEMS_TABLE_GUID + ");";
 
 	public static final String ITEM_MEDIA_TABLE = "item_media";
 	public static final String ITEM_MEDIA_TABLE_COLUMN_ID = "item_media_id";
@@ -103,6 +105,7 @@ public class DatabaseHelper extends SQLCipherOpenHelper
 			+ ITEM_MEDIA_FRAMERATE + " integer null, " 
 			+ ITEM_MEDIA_LANG + " text null, " 
 			+ ITEM_MEDIA_SAMPLE_RATE + " text null);";
+	public static final String ITEMS_MEDIA_TABLE_CREATE_INDEX = "CREATE UNIQUE INDEX item_url_index ON " + ITEM_MEDIA_TABLE + " (" + ITEM_MEDIA_ITEM_ID + "," + ITEM_MEDIA_URL + ");";
 
 	public static final String SETTINGS_TABLE = "settings";
 	public static final String SETTINGS_TABLE_ID = "settings_id";
@@ -171,7 +174,11 @@ public class DatabaseHelper extends SQLCipherOpenHelper
 		if (LOGGING)
 			Log.v(LOGTAG, "SQL: " + ITEMS_TABLE_CREATE_SQL);
 		_sqliteDatabase.execSQL(ITEMS_TABLE_CREATE_SQL);
-		
+
+		if (LOGGING)
+			Log.v(LOGTAG, "SQL: " + ITEMS_TABLE_CREATE_INDEX2);
+		_sqliteDatabase.execSQL(ITEMS_TABLE_CREATE_INDEX2);
+
 		if (LOGGING)
 			Log.v(LOGTAG, "SQL: " + ITEMS_TABLE_CREATE_INDEX);
 		_sqliteDatabase.execSQL(ITEMS_TABLE_CREATE_INDEX);
@@ -181,9 +188,17 @@ public class DatabaseHelper extends SQLCipherOpenHelper
 		_sqliteDatabase.execSQL(FEEDS_TABLE_CREATE_SQL);
 
 		if (LOGGING)
+			Log.v(LOGTAG, "SQL: " + FEEDS_TABLE_CREATE_INDEX);
+		_sqliteDatabase.execSQL(FEEDS_TABLE_CREATE_INDEX);
+
+		if (LOGGING)
 			Log.v(LOGTAG, "SQL: " + ITEMS_MEDIA_TABLE_CREATE_SQL);
 		_sqliteDatabase.execSQL(ITEMS_MEDIA_TABLE_CREATE_SQL);
-		
+
+		if (LOGGING)
+			Log.v(LOGTAG, "SQL: " + ITEMS_MEDIA_TABLE_CREATE_INDEX);
+		_sqliteDatabase.execSQL(ITEMS_MEDIA_TABLE_CREATE_INDEX);
+
 		if (LOGGING)
 			Log.v(LOGTAG, "SQL: " + SETTINGS_TABLE_CREATE_SQL);
 		_sqliteDatabase.execSQL(SETTINGS_TABLE_CREATE_SQL);
@@ -262,6 +277,22 @@ public class DatabaseHelper extends SQLCipherOpenHelper
 			// Add FEEDS_TABLE_CATEGORY
 			String FEEDS_TABLE_ALTER_SQL = "alter table " + FEEDS_TABLE + " add column " + FEEDS_TABLE_CATEGORY +  " text null";
 			_sqliteDatabase.execSQL(FEEDS_TABLE_ALTER_SQL);
+
+			// Add index to items table
+			if (LOGGING)
+				Log.v(LOGTAG, "SQL: " + ITEMS_TABLE_CREATE_INDEX2);
+			_sqliteDatabase.execSQL(ITEMS_TABLE_CREATE_INDEX2);
+
+			// Add index to feed table
+			if (LOGGING)
+				Log.v(LOGTAG, "SQL: " + FEEDS_TABLE_CREATE_INDEX);
+			_sqliteDatabase.execSQL(FEEDS_TABLE_CREATE_INDEX);
+
+			// Add index to item media table
+			if (LOGGING)
+				Log.v(LOGTAG, "SQL: " + ITEMS_MEDIA_TABLE_CREATE_INDEX);
+			_sqliteDatabase.execSQL(ITEMS_MEDIA_TABLE_CREATE_INDEX);
+
 		}
 	}
 }
