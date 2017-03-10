@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
+import java.util.Arrays;
 
 import android.content.ContentProvider;
 import android.content.ContentValues;
@@ -17,6 +18,7 @@ import android.database.MatrixCursor;
 import android.net.Uri;
 import android.os.ParcelFileDescriptor;
 import android.provider.OpenableColumns;
+import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.text.TextUtils;
 import android.util.Log;
@@ -28,6 +30,10 @@ public class SecureShareContentProvider extends ContentProvider {
 
 	public static final String LOGTAG = "SecureShareContentProvider";
 	public static final boolean LOGGING = false;
+
+	public static final String[] SUPPORTED_TYPES = {
+		"opml", "apk"
+	};
 
 	private static final String[] DEFAULT_COLUMNS = {
 			OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE
@@ -42,7 +48,7 @@ public class SecureShareContentProvider extends ContentProvider {
 
 	@Nullable
 	@Override
-	public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
+	public Cursor query(@NonNull Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
 
 		File sharedFile = getFileFromUri(uri);
 		if (sharedFile == null) {
@@ -75,11 +81,12 @@ public class SecureShareContentProvider extends ContentProvider {
 			return null;
 		}
 		String path = uri.toString().substring(CONTENT_URI.length());
-		if (TextUtils.isEmpty(path)) {
+		if (TextUtils.isEmpty(path) || !path.contains("/")) {
 			return null;
 		}
-		if (!path.startsWith("opml/")) {
-			return null; // currently only support OPML export share
+		String type = path.substring(0, path.indexOf("/"));
+		if (!Arrays.asList(SUPPORTED_TYPES).contains(type)) {
+			return null; // Only these are supported
 		}
 		String fileName = path.substring(path.indexOf("/") + 1);
 		if (TextUtils.isEmpty(fileName)) {
@@ -94,38 +101,41 @@ public class SecureShareContentProvider extends ContentProvider {
 
 	@Nullable
 	@Override
-	public String getType(Uri uri) {
-		if (uri == null || !uri.toString().startsWith(CONTENT_URI)) {
+	public String getType(@NonNull Uri uri) {
+		if (!uri.toString().startsWith(CONTENT_URI)) {
 			return null;
 		}
 		String path = uri.toString().substring(CONTENT_URI.length());
 		if (TextUtils.isEmpty(path)) {
 			return null;
 		}
-		if (!path.startsWith("opml/")) {
-			return null; // currently only support OPML export share
+		if (path.startsWith("opml/")) {
+			return "text/x-opml";
+		} else if (path.startsWith("apk/")) {
+			return "application/vnd.android.package-archive";
 		}
-		return "text/x-opml";
+
+		return null;
 	}
 
 	@Nullable
 	@Override
-	public Uri insert(Uri uri, ContentValues contentValues) {
+	public Uri insert(@NonNull Uri uri, ContentValues contentValues) {
 		throw new RuntimeException("Not supported");
 	}
 
 	@Override
-	public int delete(Uri uri, String s, String[] strings) {
+	public int delete(@NonNull Uri uri, String s, String[] strings) {
 		throw new RuntimeException("Not supported");
 	}
 
 	@Override
-	public int update(Uri uri, ContentValues contentValues, String s, String[] strings) {
+	public int update(@NonNull Uri uri, ContentValues contentValues, String s, String[] strings) {
 		throw new RuntimeException("Not supported");
 	}
 
 	@Override
-	public ParcelFileDescriptor openFile(Uri uri, String mode) throws FileNotFoundException {
+	public ParcelFileDescriptor openFile(@NonNull Uri uri, @NonNull String mode) throws FileNotFoundException {
 		File sharedFile = getFileFromUri(uri);
 		if (sharedFile == null) {
 			return null;
@@ -147,7 +157,7 @@ public class SecureShareContentProvider extends ContentProvider {
 		}
 	}
 
-	static class TransferThread extends Thread {
+	private static class TransferThread extends Thread {
 		final InputStream mIn;
 		final OutputStream mOut;
 
@@ -174,11 +184,11 @@ public class SecureShareContentProvider extends ContentProvider {
 			finally {
 				try {
 					mIn.close();
-				} catch (IOException e) {
+				} catch (IOException ignored) {
 				}
 				try {
 					mOut.close();
-				} catch (IOException e) {
+				} catch (IOException ignored) {
 				}
 			}
 		}

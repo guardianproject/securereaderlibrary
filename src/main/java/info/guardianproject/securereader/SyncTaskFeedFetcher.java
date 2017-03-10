@@ -17,7 +17,7 @@ public class SyncTaskFeedFetcher extends SyncTask<SyncTaskFeedFetcher>
 	public Feed feed;
 	private Reader reader;
 	
-	public interface SyncServiceFeedFetchedCallback
+	public interface SyncTaskFeedFetcherCallback
 	{
 		void feedFetched(Feed _feed);
 		void feedFetchError(Feed _feed);

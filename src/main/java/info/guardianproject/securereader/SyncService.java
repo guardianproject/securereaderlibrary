@@ -22,14 +22,11 @@ import com.tinymission.rss.Item;
 import com.tinymission.rss.MediaContent;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
-import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
@@ -37,7 +34,6 @@ import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 public class SyncService {
 
@@ -159,7 +155,7 @@ public class SyncService {
 		}
 	}
 
-	public PrioritizedListenableFutureTask<SyncTaskFeedFetcher> addFeedSyncTask(Feed feed, final SyncTaskFeedFetcher.SyncServiceFeedFetchedCallback callback) {
+	public PrioritizedListenableFutureTask<SyncTaskFeedFetcher> addFeedSyncTask(Feed feed, final SyncTaskFeedFetcher.SyncTaskFeedFetcherCallback callback) {
 		synchronized (syncServiceExecutorService) {
 			PrioritizedListenableFutureTask<SyncTaskFeedFetcher> task = getExistingTask(SyncTaskFeedFetcher.class, feed.getFeedURL());
 			if (task != null) {
@@ -208,7 +204,7 @@ public class SyncService {
 		}
 	}
 
-	public ListenableFuture addFeedsSyncTask(List<Feed> feeds, final SyncTaskFeedFetcher.SyncServiceFeedFetchedCallback callback) {
+	public ListenableFuture addFeedsSyncTask(List<Feed> feeds, final SyncTaskFeedFetcher.SyncTaskFeedFetcherCallback callback) {
 		if (feeds == null || feeds.size() == 0) {
 			if (callback != null) {
 				callback.feedFetched(new Feed());
@@ -308,38 +304,52 @@ public class SyncService {
 		}
 	}
 
-	public PrioritizedListenableFutureTask<SyncTaskMediaFetcher> addMediaContentSyncTask(MediaContent mediaContent) {
-		return addMediaContentSyncTask(mediaContent, false);
+	public PrioritizedListenableFutureTask<SyncTaskMediaFetcher> addMediaContentSyncTask(MediaContent mediaContent, final SyncTaskMediaFetcher.SyncTaskMediaFetcherCallback callback) {
+		return addMediaContentSyncTask(mediaContent, false, callback);
 	}
 
-	public PrioritizedListenableFutureTask<SyncTaskMediaFetcher> addMediaContentSyncTask(MediaContent mediaContent, boolean toFront) {
+	public PrioritizedListenableFutureTask<SyncTaskMediaFetcher> addMediaContentSyncTask(MediaContent mediaContent, boolean toFront, final SyncTaskMediaFetcher.SyncTaskMediaFetcherCallback callback) {
 		synchronized (syncServiceExecutorService) {
 			PrioritizedListenableFutureTask<SyncTaskMediaFetcher> task = getExistingTask(SyncTaskMediaFetcher.class, mediaContent.getUrl());
 			if (task != null) {
+				// Need to change priority?
+				if (toFront && task.getPriority() != TASK_MEDIA_UI_PRIORITY) {
+					syncServiceExecutorQueue.remove(task);
+					task.setPriority(TASK_MEDIA_UI_PRIORITY);
+					syncServiceExecutorQueue.offer(task);
+				}
 				return task; // Already in queue
 			}
 			task = (PrioritizedListenableFutureTask<SyncTaskMediaFetcher>) syncServiceExecutorService.submit(new SyncTaskMediaFetcher(context, toFront ? TASK_MEDIA_UI_PRIORITY : TASK_MEDIA_PRIORITY, mediaContent));
 			task.addListener(new PrioritizedTaskListener<SyncTaskMediaFetcher>(task) {
 				@Override
-				protected void onSuccess(SyncTaskMediaFetcher task) {
+				protected void onSuccess(final SyncTaskMediaFetcher task) {
 					// Notify listeners
 					Intent feedDownloadedIntent = new Intent(BROADCAST_SYNCSERVICE_MEDIA_DOWNLOADED);
 					feedDownloadedIntent.putExtra(EXTRA_SYNCSERVICE_MEDIA, task.mediaContent);
 					LocalBroadcastManager.getInstance(context).sendBroadcast(feedDownloadedIntent);
+					if (callback != null) {
+						handler.post(new Runnable() {
+							@Override
+							public void run() {
+								callback.mediaDownloaded(task.targetFile);
+							}
+						});
+					}
 				}
 			}, MoreExecutors.directExecutor());
 			return task;
 		}
 	}
 
-	public PrioritizedListenableFutureTask<SyncTaskMediaFetcher> addMediaContentSyncTaskToFront(MediaContent mediaContent) {
-		return addMediaContentSyncTask(mediaContent, true);
+	public PrioritizedListenableFutureTask<SyncTaskMediaFetcher> addMediaContentSyncTaskToFront(MediaContent mediaContent, final SyncTaskMediaFetcher.SyncTaskMediaFetcherCallback callback) {
+		return addMediaContentSyncTask(mediaContent, true, callback);
 	}
 
 	public void addMediaContentSyncTasksToFront(ArrayList<MediaContent> mediaContents, boolean forceStart) {
 		// TODO - maybe store futures and return a listenable future using allAsList?
 		for (MediaContent mediaContent : mediaContents) {
-			addMediaContentSyncTaskToFront(mediaContent);
+			addMediaContentSyncTaskToFront(mediaContent, null);
 		}
 	}
 
@@ -350,26 +360,6 @@ public class SyncService {
 	private class SyncServiceExecutorService extends ThreadPoolExecutor implements ListeningExecutorService {
 		SyncServiceExecutorService(int corePoolSize, int maximumPoolSize, long keepAliveTime, TimeUnit unit, BlockingQueue<Runnable> workQueue, ThreadFactory threadFactory) {
 			super(corePoolSize, maximumPoolSize, keepAliveTime, unit, workQueue, threadFactory);
-		}
-
-		@Override
-		public @NonNull <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks) throws InterruptedException {
-			return super.invokeAll(tasks);
-		}
-
-		@Override
-		public @NonNull <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit) throws InterruptedException {
-			return super.invokeAll(tasks, timeout, unit);
-		}
-
-		@Override
-		public @NonNull <T> T invokeAny(@NonNull Collection<? extends Callable<T>> tasks) throws InterruptedException, ExecutionException {
-			return super.invokeAny(tasks);
-		}
-
-		@Override
-		public <T> T invokeAny(@NonNull Collection<? extends Callable<T>> tasks, long timeout, @NonNull TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
-			return super.invokeAny(tasks, timeout, unit);
 		}
 
 		@Override
@@ -422,7 +412,7 @@ public class SyncService {
 
 	private class PrioritizedListenableFutureTask<V> extends FutureTask<V> implements ListenableFuture<V>, Comparable<PrioritizedListenableFutureTask<V>> {
 		private final ExecutionList executionList = new ExecutionList();
-		private final int priority;
+		private int priority;
 		private final Callable<V> callable;
 
 		PrioritizedListenableFutureTask(final Callable<V> callable, int priority) {
@@ -485,6 +475,10 @@ public class SyncService {
 
 		int getPriority() {
 			return priority;
+		}
+
+		void setPriority(int priority) {
+			this.priority = priority;
 		}
 
 		@Override

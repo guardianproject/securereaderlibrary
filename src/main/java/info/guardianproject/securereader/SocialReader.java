@@ -12,7 +12,6 @@ package info.guardianproject.securereader;
 //import info.guardianproject.bigbuffalo.adapters.DownloadsAdapter;
 import cz.msebera.android.httpclient.client.HttpClient;
 import cz.msebera.android.httpclient.impl.client.LaxRedirectStrategy;
-import cz.msebera.android.httpclient.impl.conn.PoolingHttpClientConnectionManager;
 import info.guardianproject.cacheword.CacheWordHandler;
 import info.guardianproject.cacheword.Constants;
 import info.guardianproject.cacheword.ICacheWordSubscriber;
@@ -24,10 +23,9 @@ import info.guardianproject.netcipher.proxy.ProxyHelper;
 import info.guardianproject.netcipher.proxy.PsiphonHelper;
 import info.guardianproject.iocipher.*;
 import info.guardianproject.securereader.HTMLRSSFeedFinder.RSSFeed;
-import info.guardianproject.securereader.MediaDownloader.MediaDownloaderCallback;
 import info.guardianproject.securereader.Settings.ProxyType;
 import info.guardianproject.securereader.Settings.UiLanguage;
-import info.guardianproject.securereader.SyncTaskFeedFetcher.SyncServiceFeedFetchedCallback;
+import info.guardianproject.securereader.SyncTaskFeedFetcher.SyncTaskFeedFetcherCallback;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -78,7 +76,6 @@ import com.tinymission.rss.Feed;
 import com.tinymission.rss.Item;
 import com.tinymission.rss.ItemToRSS;
 import com.tinymission.rss.MediaContent;
-import com.tinymission.rss.MediaContent.MediaContentType;
 import com.tinymission.rss.Comment;
 
 import org.w3c.dom.Document;
@@ -1224,7 +1221,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	/*
 	 * Utilizes the SyncService to Requests feed and feed items to be pulled from the network
 	 */
-	private void backgroundRequestFeedNetwork(Feed feed, SyncServiceFeedFetchedCallback callback)
+	private void backgroundRequestFeedNetwork(Feed feed, SyncTaskFeedFetcherCallback callback)
 	{
 		if (LOGGING)
 			Log.v(LOGTAG,"requestFeedNetwork");
@@ -1282,7 +1279,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 					if (LOGGING)
 						Log.v(LOGTAG,"It should be refreshed");
 
-					backgroundRequestFeedNetwork(feed, new SyncServiceFeedFetchedCallback() {
+					backgroundRequestFeedNetwork(feed, new SyncTaskFeedFetcherCallback() {
 						@Override
 						public void feedFetched(Feed _feed) {
 							if (feedsWithComments != null)
@@ -1414,7 +1411,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 								if (LOGGING)
 									Log.v(LOGTAG, "Adding to sync " + m.getUrl());
 								
-								syncService.addMediaContentSyncTask(m);
+								syncService.addMediaContentSyncTask(m, null);
 							}
 						}
 					}
@@ -1431,13 +1428,13 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 
 	public void manualSyncSubscribedFeeds(final FeedFetcher.FeedFetchedCallback _finalCallback)
 	{
-		if (!_manualSyncInProgress)
+		if (!_manualSyncInProgress && isOnline() == ONLINE)
 		{
 			final ArrayList<Feed> feeds = getSubscribedFeedsList();
 			if (feeds.size() > 0)
 			{
 				_manualSyncInProgress = true;
-				SyncServiceFeedFetchedCallback callback = new SyncServiceFeedFetchedCallback() {
+				SyncTaskFeedFetcher.SyncTaskFeedFetcherCallback callback = new SyncTaskFeedFetcher.SyncTaskFeedFetcherCallback() {
 					@Override
 					public void feedFetched(Feed _feed) {
 						if (LOGGING)
@@ -1469,39 +1466,32 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	 * will override the default syncing behavior forcing an immediate network
 	 * sync.
 	 */
-	public void manualSyncFeed(Feed feed, FeedFetcher.FeedFetchedCallback callback)
-	{
+	public void manualSyncFeed(Feed feed, final FeedFetcher.FeedFetchedCallback _finalCallback) {
 		//TODO refacoring
-//		if (isOnline() == ONLINE)
-//		{
-//			// Adding an intermediate callback
-//			// Essentially, I never want it directly from the network, I want to
-//			// re-request it from the database
-//
-//			final FeedFetcher.FeedFetchedCallback finalcallback = callback;
-//			FeedFetcher.FeedFetchedCallback intermediateCallback = callback;
-//
-//			if (databaseAdapter != null && databaseAdapter.databaseReady())
-//			{
-//				intermediateCallback = new FeedFetcher.FeedFetchedCallback()
-//				{
-//					@Override
-//					public void feedFetched(Feed _feed)
-//					{
-//						if (finalcallback != null) {
-//							Feed updatedFeed = getFeed(_feed);
-//							if (appStatus == SocialReader.APP_IN_FOREGROUND) {
-//								finalcallback.feedFetched(updatedFeed);
-//							}
-//						}
-//					}
-//				};
-//			}
-//
-//			if (LOGGING)
-//				Log.v(LOGTAG, "Refreshing Feed from Network");
-//			foregroundRequestFeedNetwork(feed, intermediateCallback);
-//		}
+		if (isOnline() == ONLINE) {
+			SyncTaskFeedFetcher.SyncTaskFeedFetcherCallback callback = new SyncTaskFeedFetcher.SyncTaskFeedFetcherCallback() {
+				@Override
+				public void feedFetched(Feed _feed) {
+					if (LOGGING)
+						Log.v(LOGTAG, "Manual resync done!");
+					_manualSyncInProgress = false;
+					if (_finalCallback != null) {
+						_finalCallback.feedFetched(_feed);
+					}
+				}
+
+				@Override
+				public void feedFetchError(Feed _feed) {
+					if (LOGGING)
+						Log.v(LOGTAG, "Manual resync failed!");
+					_manualSyncInProgress = false;
+					if (_finalCallback != null) {
+						_finalCallback.feedError(_feed);
+					}
+				}
+			};
+			syncService.addFeedSyncTask(feed, callback);
+		}
 	}
 
 	/*
@@ -2110,7 +2100,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	{
 		if (settings.syncMode() != Settings.SyncMode.BitWise) {
 			for (MediaContent contentItem : item.getMediaContent()) {
-				syncService.addMediaContentSyncTask(contentItem);
+				syncService.addMediaContentSyncTask(contentItem, null);
 			}
 		}
 	}
@@ -2445,7 +2435,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	{
 		final ImageView finalImageView = imageView;
 
-		MediaDownloaderCallback mdc = new MediaDownloaderCallback()
+		SyncTaskMediaFetcherCallback mdc = new SyncTaskMediaFetcherCallback()
 		{
 			@Override
 			public void mediaDownloaded(File mediaFile)
@@ -2517,120 +2507,41 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		return loadMediaContent(mc, null, false, false);
 	}
 	
-	public boolean loadMediaContent(MediaContent mc, MediaDownloaderCallback mdc) {
+	public boolean loadMediaContent(MediaContent mc, SyncTaskMediaFetcher.SyncTaskMediaFetcherCallback mdc) {
 		return loadMediaContent(mc, mdc, false);
 	}
 
-	public boolean loadMediaContent(MediaContent mc, MediaDownloaderCallback mdc, boolean forceBitwiseDownload)
+	public boolean loadMediaContent(MediaContent mc, SyncTaskMediaFetcher.SyncTaskMediaFetcherCallback mdc, boolean forceBitwiseDownload)
 	{
 		return loadMediaContent(mc, mdc, true, forceBitwiseDownload);
 	}
 	
-	public boolean loadMediaContent(MediaContent mc, MediaDownloaderCallback mdc, boolean download, boolean forceBitwiseDownload)
-	{
-		//Log.v(LOGTAG, "loadImageMediaContent: " + mc.getUrl() + " " + mc.getType());
-		
-		final MediaDownloaderCallback mediaDownloaderCallback = mdc;
-		
-		if (mc.getMediaContentType() == MediaContentType.EPUB) {
-			
-			java.io.File possibleFile = new java.io.File(this.getNonVirtualFileSystemDir(), MEDIA_CONTENT_FILE_PREFIX + mc.getDatabaseId());
-			
-			if (possibleFile.exists())
-			{
-				//Log.v(LOGTAG, "Already downloaded: " + possibleFile.getAbsolutePath());
-				if (mdc != null)
-				mdc.mediaDownloadedNonVFS(possibleFile);
-				return true;
-			}
-			else if (download && forceBitwiseDownload && isOnline() == ONLINE)
-			//else if ((settings.syncMode() != Settings.SyncMode.BitWise || forceBitwiseDownload) && isOnline() == ONLINE)
-			// only want to download this content type if they click it so...
-			{
-				if (LOGGING)
-					Log.v(LOGTAG, "File doesn't exist, downloading");
-	
-				NonVFSMediaDownloader mediaDownloader = new NonVFSMediaDownloader(this,possibleFile);
-				mediaDownloader.setMediaDownloaderCallback(new NonVFSMediaDownloader.MediaDownloaderCallback() {
-					@Override
-					public void mediaDownloaded(java.io.File mediaFile) {
-						mediaFile.setReadable(true, false); // Security alert
-						mediaDownloaderCallback.mediaDownloadedNonVFS(mediaFile);
-					}
-				});
-				mediaDownloader.execute(mc);
-	
-				return true;
-			}
-			else {
-				return false;
-			}
-			
-		} 
-		else if (mc.getMediaContentType() == MediaContentType.AUDIO || mc.getMediaContentType() == MediaContentType.VIDEO) 
-		{
-			File possibleFile = new File(getFileSystemDir(), MEDIA_CONTENT_FILE_PREFIX + mc.getDatabaseId());
-			if (possibleFile.exists())
-			{
-				if (LOGGING)
-					Log.v(LOGTAG, "Already downloaded: " + possibleFile.getAbsolutePath());
-				if (mdc != null)
-				mdc.mediaDownloaded(possibleFile);
-				return true;
-			}
-			else if (download && forceBitwiseDownload && isOnline() == ONLINE)
-			{
-				if (LOGGING)
-					Log.v(LOGTAG, "File doesn't exist, downloading");
-	
-				MediaDownloader mediaDownloader = new MediaDownloader(this);
-				mediaDownloader.setMediaDownloaderCallback(mdc);
-	
-				mediaDownloader.execute(mc);
-	
-				return true;
-			}
-			else
-			{
-				//if (LOGGING)
-				//Log.v(LOGTAG, "Can't download, not online or in bitwise mode");
-				return false;
-			}			
+	public boolean loadMediaContent(MediaContent mc, final SyncTaskMediaFetcher.SyncTaskMediaFetcherCallback mdc, boolean download, boolean forceBitwiseDownload) {
+		switch (mc.getMediaContentType()) {
+			case IMAGE:
+				forceBitwiseDownload = forceBitwiseDownload || (settings.syncMode() != Settings.SyncMode.BitWise);
+				// Allow to fall through
+			case EPUB:
+			case VIDEO:
+			case AUDIO:
+				File possibleFile = new File(getFileSystemDir(), MEDIA_CONTENT_FILE_PREFIX + mc.getDatabaseId());
+				if (possibleFile.exists()) {
+					if (LOGGING)
+						Log.v(LOGTAG, "Already downloaded: " + possibleFile.getAbsolutePath());
+					if (mdc != null)
+						mdc.mediaDownloaded(possibleFile);
+					return true;
+				} else if (download && forceBitwiseDownload && isOnline() == ONLINE) {
+					if (LOGGING)
+						Log.v(LOGTAG, "File doesn't exist, downloading");
+					syncService.addMediaContentSyncTaskToFront(mc, mdc);
+					return true;
+				}
+				break;
 		}
-		else if (mc.getMediaContentType() == MediaContentType.IMAGE) 
-		{
-			File possibleFile = new File(getFileSystemDir(), MEDIA_CONTENT_FILE_PREFIX + mc.getDatabaseId());
-			if (possibleFile.exists())
-			{
-				if (LOGGING)
-					Log.v(LOGTAG, "Already downloaded: " + possibleFile.getAbsolutePath());
-				if (mdc != null)
-				mdc.mediaDownloaded(possibleFile);
-				return true;
-			}
-			else if (download && (settings.syncMode() != Settings.SyncMode.BitWise || forceBitwiseDownload) && isOnline() == ONLINE)
-			{
-				if (LOGGING)
-					Log.v(LOGTAG, "File doesn't exist, downloading");
-	
-				MediaDownloader mediaDownloader = new MediaDownloader(this);
-				mediaDownloader.setMediaDownloaderCallback(mdc);
-	
-				mediaDownloader.execute(mc);
-	
-				return true;
-			}
-			else
-			{
-				//if (LOGGING)
-				//Log.v(LOGTAG, "Can't download, not online or in bitwise mode");
-				return false;
-			}
-		} else {
-			if (LOGGING)
-				Log.v(LOGTAG,"Not a media type we support: " + mc.getType());
-			return false;
-		}
+		if (LOGGING)
+			Log.v(LOGTAG, "Not a media type we support: " + mc.getType());
+		return false;
 	}
 
 	public void deleteMediaContentFileNow(final long mediaContentDatabaseId) {
@@ -3068,4 +2979,38 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		}
 	}
 
+	public Uri addFileToSecureShare(File vfsFile, String type, String fileName) {
+		try {
+			if (!vfsFile.exists() || !Arrays.asList(SecureShareContentProvider.SUPPORTED_TYPES).contains(type)) {
+				return null;
+			}
+
+			// Make sure share dir exists
+			File shareDir = new File(getVFSSharingDir(), type);
+			if (!shareDir.exists() && !shareDir.mkdir()) {
+				return null;
+			}
+			File sharedFile = new File(shareDir, fileName);
+			if (!sharedFile.exists() && !sharedFile.createNewFile()) {
+				return null;
+			}
+
+			// Copy to export dir
+			InputStream in = new FileInputStream(vfsFile);
+			OutputStream out = new FileOutputStream(sharedFile);
+
+			// Transfer bytes from in to out
+			byte[] buf = new byte[8096];
+			int len;
+			while ((len = in.read(buf)) > 0) {
+				out.write(buf, 0, len);
+			}
+			in.close();
+			out.close();
+
+			return Uri.parse(SecureShareContentProvider.CONTENT_URI + type + "/" + fileName);
+		} catch (Exception ignored) {
+			return null;
+		}
+	}
 }

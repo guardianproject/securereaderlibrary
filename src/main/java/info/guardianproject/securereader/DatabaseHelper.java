@@ -11,7 +11,7 @@ import android.util.Log;
 public class DatabaseHelper extends SQLCipherOpenHelper
 {
 	public static String LOGTAG = "DatabaseHelper";
-	public static boolean LOGGING = true;
+	public static boolean LOGGING = false;
 
 	public static final String DATABASE_NAME = "bigbuffalo.db";
 	public static final int DATABASE_VERSION = 5;
@@ -94,7 +94,7 @@ public class DatabaseHelper extends SQLCipherOpenHelper
 	
 	public static final String ITEMS_MEDIA_TABLE_CREATE_SQL = "create table " + ITEM_MEDIA_TABLE + " (" 
 			+ ITEM_MEDIA_TABLE_COLUMN_ID + " integer primary key autoincrement, " 
-			+ ITEM_MEDIA_ITEM_ID + " integer not null, " 
+			+ ITEM_MEDIA_ITEM_ID + " integer null, "
 			+ ITEM_MEDIA_URL + " text not null, " 
 			+ ITEM_MEDIA_TYPE + " text null, " 
 			+ ITEM_MEDIA_MEDIUM + " text null, " 
@@ -111,7 +111,7 @@ public class DatabaseHelper extends SQLCipherOpenHelper
 			+ ITEM_MEDIA_SAMPLE_RATE + " text null,"
 			+ " CONSTRAINT fk_item FOREIGN KEY (" + ITEM_MEDIA_ITEM_ID + ")"
 			+ " REFERENCES " + ITEMS_TABLE + "(" + ITEMS_TABLE_COLUMN_ID + ")"
-			+ " ON DELETE CASCADE"
+			+ " ON DELETE SET NULL"
 			+ ");";
 	public static final String ITEMS_MEDIA_TABLE_CREATE_INDEX = "CREATE UNIQUE INDEX media_item_url_index ON " + ITEM_MEDIA_TABLE + " (" + ITEM_MEDIA_ITEM_ID + "," + ITEM_MEDIA_URL + ");";
 

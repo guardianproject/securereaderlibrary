@@ -78,8 +78,8 @@ abstract public class SyncTask<T> implements Callable<T> {
                 if (LOGGING)
                     Log.v(toString(), "Have a file:/// url");
                 URI existingFileUri = new URI(urlString);
-                File existingFile = new File(existingFileUri);
-                copyFile(existingFile, targetFile);
+                java.io.File existingFile = new java.io.File(existingFileUri);
+                copyFileFromFStoVFS(existingFile, targetFile);
             } else {
                 statusCode = downloadToFileHttp(urlString, targetFile);
             }
@@ -113,7 +113,6 @@ abstract public class SyncTask<T> implements Callable<T> {
                 } else {
                     BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(targetFile));
                     InputStream inputStream = entity.getContent();
-                    long size = entity.getContentLength();
 
                     byte data[] = new byte[8192];
                     int count;
@@ -125,13 +124,6 @@ abstract public class SyncTask<T> implements Callable<T> {
 
                     inputStream.close();
                     bos.close();
-                    entity.consumeContent();
-
-                    if (size != total) {
-                        if (LOGGING)
-                            Log.e(toString(), "File length mismatch for " + urlString);
-                        statusCode = HttpStatus.SC_PARTIAL_CONTENT;
-                    }
                 }
             }
         } catch (Exception ignored) {
@@ -141,19 +133,19 @@ abstract public class SyncTask<T> implements Callable<T> {
         return statusCode;
     }
 
-    private void copyFile(File src, File dst) throws IOException
-	{
-		InputStream in = new FileInputStream(src);
-		OutputStream out = new FileOutputStream(dst);
+    private void copyFileFromFStoVFS(java.io.File src, info.guardianproject.iocipher.File dst) throws IOException
+    {
+        InputStream in = new java.io.FileInputStream(src);
+        OutputStream out = new info.guardianproject.iocipher.FileOutputStream(dst);
 
-		// Transfer bytes from in to out
-		byte[] buf = new byte[1024];
-		int len;
-		while ((len = in.read(buf)) > 0)
-		{
-			out.write(buf, 0, len);
-		}
-		in.close();
-		out.close();
-	}
+        // Transfer bytes from in to out
+        byte[] buf = new byte[8096];
+        int len;
+        while ((len = in.read(buf)) > 0)
+        {
+            out.write(buf, 0, len);
+        }
+        in.close();
+        out.close();
+    }
 }

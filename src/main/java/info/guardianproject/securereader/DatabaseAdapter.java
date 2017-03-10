@@ -34,7 +34,7 @@ import com.tinymission.rss.MediaContent;
 
 public class DatabaseAdapter
 {
-	public static final boolean LOGGING = true;
+	public static final boolean LOGGING = false;
 	public static final String LOGTAG = "DatabaseAdapter";
 	
 	private final DatabaseHelper databaseHelper;
@@ -332,17 +332,11 @@ public class DatabaseAdapter
 		try
 		{
 			if (databaseReady()) {
-				ArrayList<MediaContent> mediaContents = new ArrayList<>();
-				for (Item item : getFeedItems(feedDatabaseId, Integer.MAX_VALUE)) {
-					mediaContents.addAll(getItemMedia(item));
-				}
 				returnValue = db.delete(DatabaseHelper.FEEDS_TABLE, DatabaseHelper.FEEDS_TABLE_COLUMN_ID + "=?", new String[]{String.valueOf(feedDatabaseId)}) > 0;
 				if (returnValue) {
 					// Delete any media files we have downloaded
-					for (MediaContent mediaContent : mediaContents) {
-						//TODO - ugly to pass null here, fixme
-						SocialReader.getInstance(null).deleteMediaContentFileNow(mediaContent.getDatabaseId());
-					}
+					//TODO - ugly to pass null here, fixme
+					cleanupMediaItemsAndFiles(SocialReader.getInstance(null));
 				}
 			}
 		}
@@ -879,14 +873,11 @@ public class DatabaseAdapter
 		try
 		{
 			if (databaseReady()) {
-				ArrayList<MediaContent> mediaContents = getItemMedia(itemDatabaseId);
 				returnValue = db.delete(DatabaseHelper.ITEMS_TABLE, DatabaseHelper.ITEMS_TABLE_COLUMN_ID + "=?", new String[]{String.valueOf(itemDatabaseId)}) > 0;
 				if (returnValue) {
 					// Delete any media files we have downloaded
-					for (MediaContent mediaContent : mediaContents) {
-						//TODO - ugly to pass null here, fixme
-						SocialReader.getInstance(null).deleteMediaContentFileNow(mediaContent.getDatabaseId());
-					}
+					//TODO - ugly to pass null here, fixme
+					cleanupMediaItemsAndFiles(SocialReader.getInstance(null));
 				}
 			}
 		}
@@ -3204,5 +3195,69 @@ public class DatabaseAdapter
 				e.printStackTrace();
 		}
 
+	}
+
+	private int cleanupMediaItemsAndFiles(SocialReader socialReader) {
+		if (LOGGING)
+			Log.v(LOGTAG, "cleanupMediaItemsAndFiles");
+
+		int numMediaFilesDeleted = 0;
+
+		Cursor queryCursor = null;
+		String query = "SELECT " + DatabaseHelper.ITEM_MEDIA_TABLE_COLUMN_ID
+				+ " FROM " + DatabaseHelper.ITEM_MEDIA_TABLE
+				+ " WHERE " + DatabaseHelper.ITEM_MEDIA_ITEM_ID + " IS NULL;";
+		if (LOGGING)
+			Log.v(LOGTAG, query);
+
+		if (databaseReady()) {
+			try
+			{
+				db.beginTransaction();
+
+				queryCursor = db.rawQuery(query, null);
+				int idColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEM_MEDIA_TABLE_COLUMN_ID);
+				if (queryCursor.moveToFirst())
+				{
+					do
+					{
+						int mediaId = queryCursor.getInt(idColumn);
+						socialReader.deleteMediaContentFileNow(mediaId);
+						numMediaFilesDeleted += db.delete(DatabaseHelper.ITEM_MEDIA_TABLE, DatabaseHelper.ITEM_MEDIA_TABLE_COLUMN_ID + "=?", new String[]{String.valueOf(mediaId)});
+					}
+					while (queryCursor.moveToNext());
+				}
+				else {
+					if (LOGGING)
+						Log.v(LOGTAG,"Couldn't move to first?");
+				}
+
+				queryCursor.close();
+				db.setTransactionSuccessful();
+			}
+			catch (Exception e)
+			{
+				if (LOGGING)
+					e.printStackTrace();
+			}
+			finally
+			{
+				if (queryCursor != null)
+				{
+					try
+					{
+						queryCursor.close();
+					}
+					catch(Exception e) {
+						if (LOGGING)
+							e.printStackTrace();
+					}
+				}
+				db.endTransaction();
+			}
+		}
+		if (LOGGING)
+			Log.d(LOGTAG, "Cleaned up "+ numMediaFilesDeleted + " media files");
+		return numMediaFilesDeleted;
 	}
 }

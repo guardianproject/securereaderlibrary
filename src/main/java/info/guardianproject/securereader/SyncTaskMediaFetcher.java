@@ -16,9 +16,15 @@ public class SyncTaskMediaFetcher extends SyncTask<SyncTaskMediaFetcher> {
 	private final static boolean LOGGING = false;
 	private final static String LOGTAG = "SyncTaskMediaFetcher";
 
-	public final MediaContent mediaContent;
+	public interface SyncTaskMediaFetcherCallback
+	{
+		void mediaDownloaded(File mediaFile);
+	}
 
-	public SyncTaskMediaFetcher(Context context, int priority, MediaContent mediaContent)
+	public final MediaContent mediaContent;
+    public File targetFile;
+
+    public SyncTaskMediaFetcher(Context context, int priority, MediaContent mediaContent)
 	{
 		super(context, priority);
 		this.mediaContent = mediaContent;
@@ -32,7 +38,7 @@ public class SyncTaskMediaFetcher extends SyncTask<SyncTaskMediaFetcher> {
 	public SyncTaskMediaFetcher call() throws Exception {
 		SocialReader socialReader = SocialReader.getInstance(getContext());
 		if (mediaContent != null && !TextUtils.isEmpty(mediaContent.getUrl())) {
-			File targetFile = new File(socialReader.getFileSystemDir(), SocialReader.MEDIA_CONTENT_FILE_PREFIX + mediaContent.getDatabaseId());
+            targetFile = new File(socialReader.getFileSystemDir(), SocialReader.MEDIA_CONTENT_FILE_PREFIX + mediaContent.getDatabaseId());
 			if (!targetFile.exists()) {
 				int statusCode = downloadToFile(mediaContent.getUrl(), targetFile);
 				if (statusCode == HttpStatus.SC_OK) {

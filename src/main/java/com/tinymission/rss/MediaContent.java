@@ -48,19 +48,6 @@ public class MediaContent extends FeedEntity implements Serializable
 	private String lang;
 	private String sampligRate;
 
-	// This isn't in the database, just a way to pass it around..
-	// Not fully implemented
-	private java.io.File downloadedNonVFSFile;
-	public void setDownloadedNonVFSFile(java.io.File _downloadedNonVFSFile) {
-		downloadedNonVFSFile = _downloadedNonVFSFile;
-	}
-	public java.io.File getDownloadedNonVFSFile() {
-		return downloadedNonVFSFile;
-	}
-	
-	//private Uri localUri;
-	//private String filePath;
-
 	public MediaContent(Attributes attributes)
 	{
 		super(attributes);
