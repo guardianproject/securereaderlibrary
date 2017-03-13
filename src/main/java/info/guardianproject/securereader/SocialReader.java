@@ -69,6 +69,7 @@ import android.os.Handler;
 import android.os.Message;
 import android.os.StatFs;
 import android.support.v4.content.LocalBroadcastManager;
+import android.text.Html;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -837,7 +838,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 			sb.append("</head>");
 			sb.append("<body>");
 			for (Feed feed : subscribedFeeds) {
-				sb.append(String.format("<outline text=\"%1$s\" xmlUrl=\"%2$s\" />", feed.getTitle(), feed.getFeedURL()));
+				sb.append(String.format("<outline text=\"%1$s\" xmlUrl=\"%2$s\" />", TextUtils.htmlEncode(feed.getTitle()), TextUtils.htmlEncode(feed.getFeedURL())));
 			}
 			sb.append("</body>");
 			sb.append("</opml>");
