@@ -290,7 +290,8 @@ public class DatabaseHelper extends SQLCipherOpenHelper
 
 			_sqliteDatabase.execSQL(COMMENTS_TABLE_CREATE_SQL);
 
-		} else if (newVersion > oldVersion && oldVersion < 4 && newVersion >= 4) {
+		}
+		if (newVersion > oldVersion && oldVersion < 4 && newVersion >= 4) {
 			// Add FEEDS_TABLE_CATEGORY
 			String FEEDS_TABLE_ALTER_SQL = "alter table " + FEEDS_TABLE + " add column " + FEEDS_TABLE_CATEGORY + " text null";
 			_sqliteDatabase.execSQL(FEEDS_TABLE_ALTER_SQL);
@@ -309,7 +310,8 @@ public class DatabaseHelper extends SQLCipherOpenHelper
 			if (LOGGING)
 				Log.v(LOGTAG, "SQL: " + ITEMS_MEDIA_TABLE_CREATE_INDEX);
 			_sqliteDatabase.execSQL(ITEMS_MEDIA_TABLE_CREATE_INDEX);
-		} else if (newVersion > oldVersion && oldVersion < 5 && newVersion >= 5) {
+		}
+		if (newVersion > oldVersion && oldVersion < 5 && newVersion >= 5) {
 
 			// Add index to tags table
 			if (LOGGING)

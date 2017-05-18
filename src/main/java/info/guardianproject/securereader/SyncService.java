@@ -346,13 +346,6 @@ public class SyncService {
 		return addMediaContentSyncTask(mediaContent, true, callback);
 	}
 
-	public void addMediaContentSyncTasksToFront(ArrayList<MediaContent> mediaContents, boolean forceStart) {
-		// TODO - maybe store futures and return a listenable future using allAsList?
-		for (MediaContent mediaContent : mediaContents) {
-			addMediaContentSyncTaskToFront(mediaContent, null);
-		}
-	}
-
 	public int getNumWaitingToSync() {
 		return syncServiceExecutorQueue.size();
 	}

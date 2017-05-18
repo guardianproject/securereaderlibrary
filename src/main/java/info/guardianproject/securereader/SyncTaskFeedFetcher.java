@@ -15,8 +15,7 @@ public class SyncTaskFeedFetcher extends SyncTask<SyncTaskFeedFetcher>
 	public final static String LOGTAG = "SyncTaskFeedFetcher";
 
 	public Feed feed;
-	private Reader reader;
-	
+
 	public interface SyncTaskFeedFetcherCallback
 	{
 		void feedFetched(Feed _feed);
@@ -33,15 +32,10 @@ public class SyncTaskFeedFetcher extends SyncTask<SyncTaskFeedFetcher>
 		return feed.getFeedURL();
 	}
 
-	// TODO - refactoring - remove this?
-	public void stop() {
-		if (reader != null) reader.stop();
-	}
-	
 	@Override
 	public SyncTaskFeedFetcher call() throws Exception {
 		SocialReader socialReader = SocialReader.getInstance(getContext());
-		reader = new Reader(socialReader, feed);
+		Reader reader = new Reader(socialReader, feed);
 		feed = reader.fetchFeed();
 		if (feed != null) {
 			SocialReader.getInstance(getContext()).setFeedAndItemData(feed);

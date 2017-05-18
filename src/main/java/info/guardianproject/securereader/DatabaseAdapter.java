@@ -44,10 +44,12 @@ public class DatabaseAdapter
 	public SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
 
 	private final CacheWordHandler cacheword;
+	private final Context context;
 
 	public DatabaseAdapter(CacheWordHandler _cacheword, Context _context)
 	{
 		cacheword = _cacheword;
+		context = _context;
 		SQLiteDatabase.loadLibs(_context);
 		this.databaseHelper = new DatabaseHelper(cacheword, _context);
 		open();
@@ -320,7 +322,7 @@ public class DatabaseAdapter
 	}
 
 	/**
-	 * Delete the given feed. The delete will cascase, i.e. all items, media, tags and comments that
+	 * Delete the given feed. The delete will cascade, i.e. all items, media, tags and comments that
 	 * belong to the feed are also deleted.
 	 * @param feedDatabaseId The database id of the feed to delete.
 	 * @return true if the feed was deleted successfully.
@@ -335,8 +337,7 @@ public class DatabaseAdapter
 				returnValue = db.delete(DatabaseHelper.FEEDS_TABLE, DatabaseHelper.FEEDS_TABLE_COLUMN_ID + "=?", new String[]{String.valueOf(feedDatabaseId)}) > 0;
 				if (returnValue) {
 					// Delete any media files we have downloaded
-					//TODO - ugly to pass null here, fixme
-					cleanupMediaItemsAndFiles(SocialReader.getInstance(null));
+					cleanupMediaItemsAndFiles(SocialReader.getInstance(context));
 				}
 			}
 		}
@@ -876,8 +877,7 @@ public class DatabaseAdapter
 				returnValue = db.delete(DatabaseHelper.ITEMS_TABLE, DatabaseHelper.ITEMS_TABLE_COLUMN_ID + "=?", new String[]{String.valueOf(itemDatabaseId)}) > 0;
 				if (returnValue) {
 					// Delete any media files we have downloaded
-					//TODO - ugly to pass null here, fixme
-					cleanupMediaItemsAndFiles(SocialReader.getInstance(null));
+					cleanupMediaItemsAndFiles(SocialReader.getInstance(context));
 				}
 			}
 		}
@@ -1969,12 +1969,18 @@ public class DatabaseAdapter
 				createdTransaction = true;
 			}
 
+			// Three stage process:
+			// 1. Mark the "media type" of all media belonging to this item in the DB as "invalid"
+			// 2. Insert/update all media from the given list
+			// 3. Delete all media with type "invalid", since these are stale media items
+			//
 			ContentValues values = new ContentValues(1);
 			values.put(DatabaseHelper.ITEM_MEDIA_TYPE, "invalid");
 			int tempMarkedInvalid = db.update(DatabaseHelper.ITEM_MEDIA_TABLE, values, DatabaseHelper.ITEM_MEDIA_ITEM_ID + " = ?", new String[] { String.valueOf(item.getDatabaseId()) });
-
 			if (LOGGING)
 				Log.v(LOGTAG, String.valueOf(tempMarkedInvalid) + " itemMedia marked invalid for " + item.getDatabaseId());
+
+			// Insert/update
 			for (MediaContent itemMedia : itemMediaList)
 			{
 				itemMedia.setItemDatabaseId(item.getDatabaseId());
@@ -1983,6 +1989,7 @@ public class DatabaseAdapter
 					Log.v(LOGTAG,"itemMedia added or updated: " + itemMedia.getDatabaseId());
 			}
 
+			// Remove stale items
 			int removed = db.delete(DatabaseHelper.ITEM_MEDIA_TABLE, DatabaseHelper.ITEM_MEDIA_TYPE + " = ?", new String[]{ "invalid" });
 			if (LOGGING)
 				Log.v(LOGTAG, String.valueOf(removed) + " itemMedia removed for " + item.getDatabaseId());
@@ -2938,36 +2945,6 @@ public class DatabaseAdapter
 		deleteItemTags(item.getDatabaseId());
 	}
 
-	private long deleteOldItemMedia(Item item, ArrayList<MediaContent> itemMediaList)
-	{
-		long numDeleted = 0;
-		try
-		{
-			//TODO refactoring
-//			String databaseIds = Joiner.on(",").join(Iterables.transform(itemMediaList, new Function<MediaContent, String>()
-//					{
-//				@Override
-//				public String apply(MediaContent mc) {
-//					return Long.toString(mc.getDatabaseId());
-//				}
-//			}));
-//			if (databaseReady()) {
-//				numDeleted = db.delete(DatabaseHelper.ITEM_MEDIA_TABLE, DatabaseHelper.ITEM_MEDIA_ITEM_ID + "=? AND " + DatabaseHelper.ITEM_MEDIA_TABLE_COLUMN_ID + " NOT IN (" + databaseIds + ")", new String[] { String.valueOf(item.getDatabaseId()) });
-//			}
-		}
-		catch (SQLException e)
-		{
-			if (LOGGING) 
-				e.printStackTrace();
-		}
-		catch(IllegalStateException e)
-		{
-			if (LOGGING)
-				e.printStackTrace();
-		}
-		return numDeleted;
-	}
-	
 	public long mediaFileSize() {
 		long totalFileSize = 0;
 
