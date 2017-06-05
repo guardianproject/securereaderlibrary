@@ -2530,7 +2530,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 					if (LOGGING)
 						Log.v(LOGTAG, "Already downloaded: " + possibleFile.getAbsolutePath());
 					if (mdc != null)
-						mdc.mediaDownloaded(possibleFile);
+						mdc.mediaDownloaded(mc, possibleFile);
 					return true;
 				} else if (download && forceBitwiseDownload && isOnline() == ONLINE) {
 					if (LOGGING)

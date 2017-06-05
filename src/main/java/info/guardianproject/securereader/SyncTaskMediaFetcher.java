@@ -18,7 +18,8 @@ public class SyncTaskMediaFetcher extends SyncTask<SyncTaskMediaFetcher> {
 
 	public interface SyncTaskMediaFetcherCallback
 	{
-		void mediaDownloaded(File mediaFile);
+		void mediaDownloaded(MediaContent mediaContent, File file);
+		void mediaDownloadError(MediaContent mediaContent);
 	}
 
 	public final MediaContent mediaContent;
@@ -49,6 +50,12 @@ public class SyncTaskMediaFetcher extends SyncTask<SyncTaskMediaFetcher> {
 				} else {
 					throw new Exception("Error downloading");
 				}
+			} else if (!mediaContent.getDownloaded()) {
+				// Exists, but not marked as downloaded. Do that now.
+				mediaContent.setFileSize(targetFile.length());
+				mediaContent.setDownloaded(true);
+				getBitmapDimensions(targetFile);
+				SocialReader.getInstance(getContext()).databaseAdapter.addOrUpdateItemMedia(mediaContent);
 			}
 		} else {
 			throw new Exception("Invalid URL");

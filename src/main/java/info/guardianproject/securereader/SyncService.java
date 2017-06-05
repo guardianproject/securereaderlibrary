@@ -332,7 +332,20 @@ public class SyncService {
 						handler.post(new Runnable() {
 							@Override
 							public void run() {
-								callback.mediaDownloaded(task.targetFile);
+								callback.mediaDownloaded(task.mediaContent, task.targetFile);
+							}
+						});
+					}
+				}
+
+				@Override
+				protected void onFailure(SyncTaskMediaFetcher task) {
+					super.onFailure(task);
+					if (callback != null) {
+						handler.post(new Runnable() {
+							@Override
+							public void run() {
+								callback.mediaDownloadError(null);
 							}
 						});
 					}
