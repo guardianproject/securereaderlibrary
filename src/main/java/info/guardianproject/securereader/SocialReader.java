@@ -59,6 +59,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.res.Resources;
+import android.database.Cursor;
 import android.graphics.BitmapFactory;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
@@ -1427,7 +1428,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		return _manualSyncInProgress;
 	}
 
-	public void manualSyncSubscribedFeeds(final FeedFetcher.FeedFetchedCallback _finalCallback)
+	public boolean manualSyncSubscribedFeeds(final FeedFetcher.FeedFetchedCallback _finalCallback)
 	{
 		if (!_manualSyncInProgress && isOnline() == ONLINE)
 		{
@@ -1457,8 +1458,10 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 					}
 				};
 				syncService.addFeedsSyncTask(feeds, callback);
+				return true;
 			}
 		}
+		return false;
 	}
 	
 	/*
@@ -1467,7 +1470,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	 * will override the default syncing behavior forcing an immediate network
 	 * sync.
 	 */
-	public void manualSyncFeed(Feed feed, final FeedFetcher.FeedFetchedCallback _finalCallback) {
+	public boolean manualSyncFeed(Feed feed, final FeedFetcher.FeedFetchedCallback _finalCallback) {
 		//TODO refacoring
 		if (isOnline() == ONLINE) {
 			SyncTaskFeedFetcher.SyncTaskFeedFetcherCallback callback = new SyncTaskFeedFetcher.SyncTaskFeedFetcherCallback() {
@@ -1492,7 +1495,9 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 				}
 			};
 			syncService.addFeedSyncTask(feed, callback);
+			return true;
 		}
+		return false;
 	}
 
 	/*
@@ -1542,7 +1547,38 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		}
 		return returnFeed;
 	}
-		
+
+	public Cursor getItemsCursor(long feedId, Boolean subscribed, Boolean favorited, Boolean shared, String searchPhrase, boolean randomized, int limit)
+	{
+		if (databaseAdapter != null && databaseAdapter.databaseReady())
+		{
+			try
+			{
+				return databaseAdapter.getItemsCursor(feedId, subscribed, favorited, shared, searchPhrase, randomized, limit);
+			}
+			catch(IllegalStateException e)
+			{
+				e.printStackTrace();
+			}
+		}
+		return null;
+	}
+
+	public Item itemFromCursor(Cursor cursor, int position) {
+		if (databaseAdapter != null && databaseAdapter.databaseReady())
+		{
+			try
+			{
+				return databaseAdapter.itemFromCursor(cursor, position);
+			}
+			catch(IllegalStateException e)
+			{
+				e.printStackTrace();
+			}
+		}
+		return null;
+	}
+
 	public Feed getFeedItemsWithTag(Feed feed, String tag) {
 		Feed returnFeed = new Feed();
 		if (databaseAdapter != null && databaseAdapter.databaseReady())

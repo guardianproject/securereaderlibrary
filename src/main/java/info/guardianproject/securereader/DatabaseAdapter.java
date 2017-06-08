@@ -737,8 +737,145 @@ public class DatabaseAdapter
 			}
 		}
 		return feed;		
-	}	
-	
+	}
+
+	public Cursor getItemsCursor(long feedId, Boolean subscribed, Boolean favorited, Boolean shared, String searchPhrase, boolean randomized, int limit)
+	{
+		try
+		{
+			ArrayList<String> params = new ArrayList<>();
+
+			String query = "select " + DatabaseHelper.ITEMS_TABLE_COLUMN_ID + ", " + DatabaseHelper.ITEMS_TABLE_AUTHOR + ", "
+					+ DatabaseHelper.ITEMS_TABLE_CATEGORY + ", " + DatabaseHelper.ITEMS_TABLE_DESCRIPTION + ", " + DatabaseHelper.ITEMS_TABLE_CONTENT_ENCODED
+					+ ", " + DatabaseHelper.ITEMS_TABLE_FAVORITE + ", " + DatabaseHelper.ITEMS_TABLE_GUID + ", " + DatabaseHelper.ITEMS_TABLE_LINK + ", "
+					+ DatabaseHelper.ITEMS_TABLE_SOURCE + ", " + DatabaseHelper.ITEMS_TABLE_TITLE + ", " + DatabaseHelper.ITEMS_TABLE_FEED_ID + ", "
+					+ DatabaseHelper.ITEMS_TABLE_PUBLISH_DATE + ", " + DatabaseHelper.FEEDS_TABLE_COLUMN_ID + ", " + DatabaseHelper.ITEMS_TABLE_SHARED + ", "
+					+ DatabaseHelper.FEEDS_TABLE_TITLE + ", " + DatabaseHelper.FEEDS_TABLE_SUBSCRIBED + ", " + DatabaseHelper.ITEMS_TABLE_REMOTE_POST_ID + ", "
+					+ DatabaseHelper.ITEMS_TABLE_COMMENTS_URL
+					+ " from " + DatabaseHelper.ITEMS_TABLE + ", " + DatabaseHelper.FEEDS_TABLE
+			        + " where " + DatabaseHelper.ITEMS_TABLE_FEED_ID + " = " + DatabaseHelper.FEEDS_TABLE_COLUMN_ID;
+
+			if (searchPhrase != null) {
+				query += " and exists (select " + DatabaseHelper.ITEM_TAGS_TABLE_ID
+						+ " from " + DatabaseHelper.ITEM_TAGS_TABLE
+						+ " where " + DatabaseHelper.ITEM_TAGS_TABLE_ITEM_ID + " = " + DatabaseHelper.ITEMS_TABLE + "." + DatabaseHelper.ITEMS_TABLE_COLUMN_ID
+						+ " and " + DatabaseHelper.ITEM_TAG + " LIKE ?)";
+				params.add("%" + searchPhrase + "%");
+			}
+
+			if (feedId != -1) {
+				query += " and " + DatabaseHelper.ITEMS_TABLE_FEED_ID + " = ?";
+				params.add(String.valueOf(feedId));
+			}
+			if (subscribed != null) {
+				query += " and " + DatabaseHelper.FEEDS_TABLE_SUBSCRIBED + " = ?";
+				params.add(subscribed ? "1" : "0");
+			}
+			if (favorited != null) {
+				query += " and " + DatabaseHelper.ITEMS_TABLE_FAVORITE + " = ?";
+				params.add(favorited ? "1" : "0");
+			}
+			if (shared != null) {
+				query += " and " + DatabaseHelper.ITEMS_TABLE_SHARED + " = ?";
+				params.add(shared ? "1" : "0");
+			}
+			if (randomized) {
+				query += " order by RANDOM()";
+			} else {
+				query += " order by " + DatabaseHelper.ITEMS_TABLE_PUBLISH_DATE + " DESC";
+			}
+			if (limit > 0) {
+				query += " limit " + limit;
+			}
+			query += ";";
+			if (LOGGING)
+				Log.v(LOGTAG, query);
+
+			if (databaseReady()) {
+				return db.rawQuery(query, params.toArray(new String[]{}));
+			}
+		}
+		catch (SQLException | IllegalStateException e)
+		{
+			if (LOGGING)
+				e.printStackTrace();
+		}
+		return null;
+	}
+
+	public Item itemFromCursor(Cursor queryCursor, int position) {
+		Item item = null;
+		try {
+			int idColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_COLUMN_ID);
+			int authorColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_AUTHOR);
+			int categoryColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_CATEGORY);
+			int descriptionColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_DESCRIPTION);
+			int contentEncodedColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_CONTENT_ENCODED);
+			int favoriteColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_FAVORITE);
+			int sharedColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_SHARED);
+			int guidColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_GUID);
+			int linkColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_LINK);
+			int sourceColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_SOURCE);
+			int titleColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_TITLE);
+			int feedIdColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_FEED_ID);
+			int publishDateColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_PUBLISH_DATE);
+			int remotePostIdColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_REMOTE_POST_ID);
+			int commentsUrlColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_COMMENTS_URL);
+
+			int feedTableFeedIdColumn = queryCursor.getColumnIndex(DatabaseHelper.FEEDS_TABLE_COLUMN_ID);
+			int feedTableFeedTitle = queryCursor.getColumnIndex(DatabaseHelper.FEEDS_TABLE_TITLE);
+			int feedTableFeedSubscribe = queryCursor.getColumnIndex(DatabaseHelper.FEEDS_TABLE_SUBSCRIBED);
+
+
+			if (queryCursor.moveToPosition(position)) {
+				int id = queryCursor.getInt(idColumn);
+				String description = queryCursor.getString(descriptionColumn);
+				String contentEncoded = queryCursor.getString(contentEncodedColumn);
+				String title = queryCursor.getString(titleColumn);
+				long feedId = queryCursor.getLong(feedIdColumn);
+				String publishDate = queryCursor.getString(publishDateColumn);
+				String guid = queryCursor.getString(guidColumn);
+
+				String author = queryCursor.getString(authorColumn);
+				String category = queryCursor.getString(categoryColumn);
+				int favorite = queryCursor.getInt(favoriteColumn);
+				int shared = queryCursor.getInt(sharedColumn);
+				String link = queryCursor.getString(linkColumn);
+				String commentsUrl = queryCursor.getString(commentsUrlColumn);
+
+				String feedTitle = queryCursor.getString(feedTableFeedTitle);
+				int remotePostId = queryCursor.getInt(remotePostIdColumn);
+
+				item = new Item(guid, title, publishDate, feedTitle, description, feedId);
+				item.setDatabaseId(id);
+				item.setAuthor(author);
+				item.setCategory(category);
+				item.setContentEncoded(contentEncoded);
+				item.dbsetRemotePostId(remotePostId);
+				item.setCommentsUrl(commentsUrl);
+				if (favorite == 1) {
+					item.setFavorite(true);
+				} else {
+					item.setFavorite(false);
+				}
+				if (shared == 1) {
+					item.setShared(true);
+				} else {
+					item.setShared(false);
+				}
+
+				item.setGuid(guid);
+				item.setLink(link);
+				item.setMediaContent(getItemMedia(item));
+				item.setCategories(getItemTags(item));
+			}
+		} catch (SQLException | IllegalStateException e) {
+			if (LOGGING)
+				e.printStackTrace();
+		}
+		return item;
+	}
+
 	public ArrayList<Feed> getAllFeeds()
 	{
 		return getAllFeeds(false,false);
@@ -1124,7 +1261,7 @@ public class DatabaseAdapter
 		return feed;
 
 	}
-	
+
 	public Feed getAllSharedItems() {
 		Cursor queryCursor = null;
 		Feed feed = new Feed();
@@ -2847,7 +2984,7 @@ public class DatabaseAdapter
 		try {
 			
 			String query = "select " + DatabaseHelper.ITEM_TAGS_TABLE_ID + ", " + DatabaseHelper.ITEM_TAG + ", "
-					+ DatabaseHelper.ITEM_TAGS_TABLE_ITEM_ID + " from " + DatabaseHelper.ITEM_TAGS_TABLE + " where " + DatabaseHelper.ITEM_TAGS_TABLE_ITEM_ID + " =?;";
+					+ DatabaseHelper.ITEM_TAGS_TABLE_ITEM_ID + " from " + DatabaseHelper.ITEM_TAGS_TABLE + " where " + DatabaseHelper.ITEM_TAGS_TABLE_ITEM_ID + " = ?;";
 			
 			if (LOGGING)
 				Log.v(LOGTAG,query);
