@@ -533,7 +533,7 @@ public class Item extends FeedEntity implements Serializable
 
 	public MediaContent getMediaContent(int pos)
 	{
-		if (_mediaContent.size() > pos)
+		if (_mediaContent != null && _mediaContent.size() > pos)
 		{
 			return _mediaContent.get(pos);
 		}
@@ -545,12 +545,16 @@ public class Item extends FeedEntity implements Serializable
 
 	public void addMediaContent(MediaContent mediaToAdd)
 	{
+		if (_mediaContent == null)
+			_mediaContent = new ArrayList<>(1);
 		_mediaContent.add(mediaToAdd);
 	}
 
 	public int getNumberOfMediaContent()
 	{
-		return _mediaContent.size();
+		if (_mediaContent != null)
+			return _mediaContent.size();
+		return 0;
 	}
 
 	public ArrayList<MediaContent> getMediaContent()
