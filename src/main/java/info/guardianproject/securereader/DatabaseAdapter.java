@@ -1860,7 +1860,8 @@ public class DatabaseAdapter
 				+ DatabaseHelper.ITEM_MEDIA_HEIGHT + ", " + DatabaseHelper.ITEM_MEDIA_WIDTH + ", " + DatabaseHelper.ITEM_MEDIA_FILESIZE + ", "
 				+ DatabaseHelper.ITEM_MEDIA_DURATION + ", " + DatabaseHelper.ITEM_MEDIA_DEFAULT + ", " + DatabaseHelper.ITEM_MEDIA_EXPRESSION + ", "
 				+ DatabaseHelper.ITEM_MEDIA_BITRATE + ", " + DatabaseHelper.ITEM_MEDIA_FRAMERATE + ", " + DatabaseHelper.ITEM_MEDIA_LANG + ", "
-				+ DatabaseHelper.ITEM_MEDIA_DOWNLOADED + ", " + DatabaseHelper.ITEM_MEDIA_SAMPLE_RATE
+				+ DatabaseHelper.ITEM_MEDIA_DOWNLOADED + ", " + DatabaseHelper.ITEM_MEDIA_SAMPLE_RATE + ", "
+				+ DatabaseHelper.ITEM_MEDIA_GROUP
 				+ " from " + DatabaseHelper.ITEM_MEDIA_TABLE + " where " + DatabaseHelper.ITEM_MEDIA_ITEM_ID + " = "
 				+ "?;";
 
@@ -1890,8 +1891,9 @@ public class DatabaseAdapter
 				int framerateColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEM_MEDIA_FRAMERATE);
 				int langColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEM_MEDIA_LANG);
 				int samplerateColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEM_MEDIA_SAMPLE_RATE);
+				int mediaGroupColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEM_MEDIA_GROUP);
 				int itemMediaDownloadedColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEM_MEDIA_DOWNLOADED);
-				
+
 				if (queryCursor.moveToFirst())
 				{
 					do {
@@ -1914,7 +1916,8 @@ public class DatabaseAdapter
 						int framerate = queryCursor.getInt(framerateColumn);
 						String lang = queryCursor.getString(langColumn);
 						String samplerate = queryCursor.getString(samplerateColumn);
-		
+						int mediaGroup = queryCursor.getInt(mediaGroupColumn);
+
 						if (LOGGING)
 							Log.v(LOGTAG,"new MediaContent");
 						
@@ -1931,6 +1934,7 @@ public class DatabaseAdapter
 						mc.setFramerate(framerate);
 						mc.setLang(lang);
 						mc.setSampligRate(samplerate);
+						mc.setMediaGroup(mediaGroup);
 						
 						boolean downloaded = false;
 						if (queryCursor.getInt(itemMediaDownloadedColumn) == 1)
@@ -1983,7 +1987,8 @@ public class DatabaseAdapter
 				+ DatabaseHelper.ITEM_MEDIA_HEIGHT + ", " + DatabaseHelper.ITEM_MEDIA_WIDTH + ", " + DatabaseHelper.ITEM_MEDIA_FILESIZE + ", "
 				+ DatabaseHelper.ITEM_MEDIA_DURATION + ", " + DatabaseHelper.ITEM_MEDIA_DEFAULT + ", " + DatabaseHelper.ITEM_MEDIA_EXPRESSION + ", "
 				+ DatabaseHelper.ITEM_MEDIA_BITRATE + ", " + DatabaseHelper.ITEM_MEDIA_FRAMERATE + ", " + DatabaseHelper.ITEM_MEDIA_LANG + ", "
-				+ DatabaseHelper.ITEM_MEDIA_DOWNLOADED + ", " + DatabaseHelper.ITEM_MEDIA_SAMPLE_RATE
+				+ DatabaseHelper.ITEM_MEDIA_DOWNLOADED + ", " + DatabaseHelper.ITEM_MEDIA_SAMPLE_RATE + ", "
+				+ DatabaseHelper.ITEM_MEDIA_GROUP
 				+ " from " + DatabaseHelper.ITEM_MEDIA_TABLE + " where " + DatabaseHelper.ITEM_MEDIA_TABLE_COLUMN_ID + " = "
 				+ "?;";
 
@@ -2013,6 +2018,7 @@ public class DatabaseAdapter
 				int framerateColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEM_MEDIA_FRAMERATE);
 				int langColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEM_MEDIA_LANG);
 				int samplerateColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEM_MEDIA_SAMPLE_RATE);
+				int mediaGroupColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEM_MEDIA_GROUP);
 				int itemMediaDownloadedColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEM_MEDIA_DOWNLOADED);
 				
 				if (queryCursor.moveToFirst())
@@ -2036,7 +2042,8 @@ public class DatabaseAdapter
 					int framerate = queryCursor.getInt(framerateColumn);
 					String lang = queryCursor.getString(langColumn);
 					String samplerate = queryCursor.getString(samplerateColumn);
-	
+					int mediaGroup = queryCursor.getInt(mediaGroupColumn);
+
 					if (LOGGING)
 						Log.v(LOGTAG,"new MediaContent");
 					
@@ -2053,6 +2060,7 @@ public class DatabaseAdapter
 					mc.setFramerate(framerate);
 					mc.setLang(lang);
 					mc.setSampligRate(samplerate);
+					mc.setMediaGroup(mediaGroup);
 					
 					boolean downloaded = false;
 					if (queryCursor.getInt(itemMediaDownloadedColumn) == 1)
@@ -2174,6 +2182,7 @@ public class DatabaseAdapter
 				values.put(DatabaseHelper.ITEM_MEDIA_FRAMERATE, itemMedia.getFramerate());
 				values.put(DatabaseHelper.ITEM_MEDIA_LANG, itemMedia.getLang());
 				values.put(DatabaseHelper.ITEM_MEDIA_SAMPLE_RATE, itemMedia.getSampligRate());
+				values.put(DatabaseHelper.ITEM_MEDIA_GROUP, itemMedia.getMediaGroup());
 				values.put(DatabaseHelper.ITEM_MEDIA_DOWNLOADED, itemMedia.getDownloaded() ? 1 : 0);
 
 				if (itemMedia.getDatabaseId() != Feed.DEFAULT_DATABASE_ID) {

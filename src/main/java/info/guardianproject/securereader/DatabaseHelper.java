@@ -14,7 +14,7 @@ public class DatabaseHelper extends SQLCipherOpenHelper
 	public static boolean LOGGING = false;
 
 	public static final String DATABASE_NAME = "bigbuffalo.db";
-	public static final int DATABASE_VERSION = 5;
+	public static final int DATABASE_VERSION = 6;
 
 	public static final int POSTS_FEED_ID = -99;
 	public static final int DRAFTS_FEED_ID = -98;
@@ -89,7 +89,7 @@ public class DatabaseHelper extends SQLCipherOpenHelper
 	public static final String ITEM_MEDIA_FRAMERATE = "item_media_framerate";
 	public static final String ITEM_MEDIA_LANG = "item_media_lang";
 	public static final String ITEM_MEDIA_SAMPLE_RATE = "item_media_sample_rate";
-	
+	public static final String ITEM_MEDIA_GROUP = "item_media_group";
 	public static final String ITEM_MEDIA_DOWNLOADED = "item_media_downloaded";
 	
 	public static final String ITEMS_MEDIA_TABLE_CREATE_SQL = "create table " + ITEM_MEDIA_TABLE + " (" 
@@ -109,6 +109,7 @@ public class DatabaseHelper extends SQLCipherOpenHelper
 			+ ITEM_MEDIA_FRAMERATE + " integer null, " 
 			+ ITEM_MEDIA_LANG + " text null, " 
 			+ ITEM_MEDIA_SAMPLE_RATE + " text null,"
+			+ ITEM_MEDIA_GROUP + " integer default 0,"
 			+ " CONSTRAINT fk_item FOREIGN KEY (" + ITEM_MEDIA_ITEM_ID + ")"
 			+ " REFERENCES " + ITEMS_TABLE + "(" + ITEMS_TABLE_COLUMN_ID + ")"
 			+ " ON DELETE SET NULL"
@@ -386,5 +387,10 @@ public class DatabaseHelper extends SQLCipherOpenHelper
 
 
 		}
+		if (newVersion > oldVersion && oldVersion < 6 && newVersion >= 6) {
+			String ITEMS_MEDIA_TABLE_ALTER_SQL = "alter table " + ITEM_MEDIA_TABLE + " add column " + ITEM_MEDIA_GROUP + " integer default 0";
+			_sqliteDatabase.execSQL(ITEMS_MEDIA_TABLE_ALTER_SQL);
+		}
+
 	}
 }

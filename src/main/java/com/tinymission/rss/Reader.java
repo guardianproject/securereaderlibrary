@@ -65,7 +65,7 @@ public class Reader
 	 * properties of existing entities.
 	 * 
 	 */
-	public final static String[] ENTITY_TAGS = { "channel", "item", "media:content", "media:thumbnail", "enclosure", "image",
+	public final static String[] ENTITY_TAGS = { "channel", "item", "media:group", "media:content", "media:thumbnail", "enclosure", "image",
 		"feed", "entry", "author", "link"
 	};
 
@@ -276,6 +276,9 @@ public class Reader
 					feed.setStatus(Feed.STATUS_LAST_SYNC_FAILED_BAD_URL);
 				}
 			}
+			if (feed.getStatus() == Feed.STATUS_LAST_SYNC_GOOD && socialReader.getFeedPreprocessor() != null) {
+				socialReader.getFeedPreprocessor().onFeedParsed(feed);
+			}
 		}
 		catch (ParserConfigurationException pce)
 		{
@@ -322,6 +325,9 @@ public class Reader
 
 		// Keep track of which entity we're currently assigning properties to
 		private final Stack<FeedEntity> _entityStack;
+
+		private int currentMediaGroup = 0; // Reset to 0 for each item
+		private int currentMediaGroupCounter = 0; // Reset to 0 for each item
 
 		public Handler()
 		{
@@ -377,6 +383,8 @@ public class Reader
 					if (LOGGING)
 						Log.v(LOGTAG,"Found item");
 					feed.addItem(item);
+					currentMediaGroup = 0;
+					currentMediaGroupCounter = 0;
 				}
 				else if (qName.equals("enclosure"))
 				{
@@ -390,9 +398,14 @@ public class Reader
 						Log.v(LOGTAG,"Found enclosure");
 					_entityStack.add(mediaContent);
 				}
+				else if (qName.equals("media:group")) {
+					currentMediaGroupCounter++;
+					currentMediaGroup = currentMediaGroupCounter;
+				}
 				else if (qName.equals("media:content"))
 				{
 					MediaContent mediaContent = new MediaContent(attributes);
+					mediaContent.setMediaGroup(currentMediaGroup);
 					FeedEntity lastEntity = _entityStack.lastElement();
 					if (lastEntity.getClass() == Item.class)
 					{
@@ -426,7 +439,8 @@ public class Reader
 				else if (qName.equals("image"))
 				{
 					MediaContent mediaContent = new MediaContent(attributes);
-										
+					mediaContent.setMediaGroup(currentMediaGroup);
+
 					FeedEntity lastEntity = _entityStack.lastElement();
 					if (lastEntity.getClass() == Feed.class)
 					{						
@@ -503,7 +517,11 @@ public class Reader
 			}
 			else if (isEntityTag(qName))
 			{
-				_entityStack.pop();
+				if (qName.equals("media:group")) {
+					currentMediaGroup = 0;
+				} else {
+					_entityStack.pop();
+				}
 			}
 		}
 

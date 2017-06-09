@@ -47,6 +47,7 @@ public class MediaContent extends FeedEntity implements Serializable
 	private int framerate;
 	private String lang;
 	private String sampligRate;
+	private int mediaGroup;
 
 	public MediaContent(Attributes attributes)
 	{
@@ -420,6 +421,16 @@ public class MediaContent extends FeedEntity implements Serializable
 	public boolean getDownloaded()
 	{
 		return downloaded;
+	}
+
+	public int getMediaGroup()
+	{
+		return mediaGroup;
+	}
+
+	public void setMediaGroup(int mediaGroup)
+	{
+		this.mediaGroup = mediaGroup;
 	}
 
 	public MediaContentType getMediaContentType() 

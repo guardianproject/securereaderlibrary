@@ -111,6 +111,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		 */
 		String onGetFeedURL(Feed feed);
 		InputStream onFeedDownloaded(Feed feed, InputStream content, Map<String, String> headers);
+		void onFeedParsed(Feed feed);
 	}
 
 	// Change this when building for release
