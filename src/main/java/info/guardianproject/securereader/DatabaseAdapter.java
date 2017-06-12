@@ -117,7 +117,7 @@ public class DatabaseAdapter
 			values.put(DatabaseHelper.FEEDS_TABLE_LANGUAGE, feed.getLanguage());
 			values.put(DatabaseHelper.FEEDS_TABLE_DESCRIPTION, feed.getDescription());
 			values.put(DatabaseHelper.FEEDS_TABLE_LINK, feed.getLink());
-			values.put(DatabaseHelper.FEEDS_TABLE_STATUS, 0); // TODO - remove this column
+			values.put(DatabaseHelper.FEEDS_TABLE_STATUS, feed.getStatus().Value);
 			values.put(DatabaseHelper.FEEDS_TABLE_CATEGORY, feed.getCategory());
 			
 			if (feed.isSubscribed())
@@ -272,7 +272,7 @@ public class DatabaseAdapter
 				values.put(DatabaseHelper.FEEDS_TABLE_LANGUAGE, feed.getLanguage());
 				values.put(DatabaseHelper.FEEDS_TABLE_DESCRIPTION, feed.getDescription());
 				values.put(DatabaseHelper.FEEDS_TABLE_LINK, feed.getLink());
-				values.put(DatabaseHelper.FEEDS_TABLE_STATUS, 0);
+				values.put(DatabaseHelper.FEEDS_TABLE_STATUS, feed.getStatus().Value);
 				values.put(DatabaseHelper.FEEDS_TABLE_CATEGORY, feed.getCategory());
 				values.put(DatabaseHelper.FEEDS_TABLE_SUBSCRIBED, feed.isSubscribed() ? 1 : 0);
 				if (feed.getNetworkPullDate() != null) {
@@ -516,8 +516,7 @@ public class DatabaseAdapter
 				int networkPullDateColumn = queryCursor.getColumnIndex(DatabaseHelper.FEEDS_TABLE_NETWORK_PULL_DATE);
 				int publishDateColumn = queryCursor.getColumnIndex(DatabaseHelper.FEEDS_TABLE_PUBLISH_DATE);
 				int subscribedColumn = queryCursor.getColumnIndex(DatabaseHelper.FEEDS_TABLE_SUBSCRIBED);
-				int statusColumn = queryCursor.getColumnIndex(DatabaseHelper.FEEDS_TABLE_STATUS);
-				
+
 				if (queryCursor.moveToFirst())
 				{
 					int id = queryCursor.getInt(idColumn);
@@ -915,8 +914,7 @@ public class DatabaseAdapter
 				int networkPullDateColumn = queryCursor.getColumnIndex(DatabaseHelper.FEEDS_TABLE_NETWORK_PULL_DATE);
 				int publishDateColumn = queryCursor.getColumnIndex(DatabaseHelper.FEEDS_TABLE_PUBLISH_DATE);
 				int subscribedColumn = queryCursor.getColumnIndex(DatabaseHelper.FEEDS_TABLE_SUBSCRIBED);
-				int statusColumn = queryCursor.getColumnIndex(DatabaseHelper.FEEDS_TABLE_STATUS);
-	
+
 				if (queryCursor.moveToFirst())
 				{
 					do

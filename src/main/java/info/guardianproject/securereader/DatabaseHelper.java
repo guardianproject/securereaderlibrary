@@ -28,7 +28,7 @@ public class DatabaseHelper extends SQLCipherOpenHelper
 	public static final String FEEDS_TABLE_LANGUAGE = "feed_language";
 	public static final String FEEDS_TABLE_NETWORK_PULL_DATE = "feed_network_pull_date";
 	public static final String FEEDS_TABLE_SUBSCRIBED = "feed_subscribed";
-	public static final String FEEDS_TABLE_STATUS = "feed_status";
+	public static final String FEEDS_TABLE_STATUS = "feed_status"; // TODO - this can be removed. Use new syncStatus tables instead!
 	public static final String FEEDS_TABLE_CATEGORY = "feed_category";
 	
 	public static final String FEEDS_TABLE_CREATE_SQL = "create table " + FEEDS_TABLE + " (" + FEEDS_TABLE_COLUMN_ID + " integer primary key autoincrement, "
