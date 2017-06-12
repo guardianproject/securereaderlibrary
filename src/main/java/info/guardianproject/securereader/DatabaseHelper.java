@@ -1,7 +1,5 @@
 package info.guardianproject.securereader;
 
-import java.util.Date;
-
 import info.guardianproject.cacheword.CacheWordHandler;
 import info.guardianproject.cacheword.SQLCipherOpenHelper;
 import net.sqlcipher.database.SQLiteDatabase;
@@ -168,6 +166,54 @@ public class DatabaseHelper extends SQLCipherOpenHelper
 			+ ");";
 	public static final String COMMENTS_TABLE_CREATE_INDEX = "CREATE INDEX comments_item_index ON " + COMMENTS_TABLE + " (" + COMMENTS_TABLE_ITEM_ID + ");";
 
+
+	/////////////////////////
+	//
+	// SYNC STATUS TABLES
+	//
+	/////////////////////////
+
+	// Common fields
+	public static final String SYNC_STATUS_STATUS = "sync_status_status";
+	public static final String SYNC_STATUS_LAST_TRY = "sync_status_last_try";
+	public static final String SYNC_STATUS_TRY_COUNT = "sync_status_try_count";
+
+	public static final String SYNC_STATUS_FEED_TABLE = "sync_status_feed";
+	public static final String SYNC_STATUS_FEED_TABLE_FEED_ID = "sync_status_feed_feed_id";
+	public static final String SYNC_STATUS_FEED_TABLE_CREATE_SQL =  "create table " + SYNC_STATUS_FEED_TABLE + " ("
+			+ SYNC_STATUS_FEED_TABLE_FEED_ID + " integer primary key, "
+			+ SYNC_STATUS_STATUS + " integer default 0,"
+			+ SYNC_STATUS_LAST_TRY + " text not null, "
+			+ SYNC_STATUS_TRY_COUNT + " integer default 0,"
+			+ " CONSTRAINT fk_feed FOREIGN KEY (" + SYNC_STATUS_FEED_TABLE_FEED_ID + ")"
+			+ " REFERENCES " + FEEDS_TABLE + "(" + FEEDS_TABLE_COLUMN_ID + ")"
+			+ " ON DELETE CASCADE"
+			+ ");";
+
+	public static final String SYNC_STATUS_ITEM_TABLE = "sync_status_item";
+	public static final String SYNC_STATUS_ITEM_TABLE_ITEM_ID = "sync_status_item_item_id";
+	public static final String SYNC_STATUS_ITEM_TABLE_CREATE_SQL =  "create table " + SYNC_STATUS_ITEM_TABLE + " ("
+			+ SYNC_STATUS_ITEM_TABLE_ITEM_ID + " integer primary key, "
+			+ SYNC_STATUS_STATUS + " integer default 0,"
+			+ SYNC_STATUS_LAST_TRY + " text not null, "
+			+ SYNC_STATUS_TRY_COUNT + " integer default 0,"
+			+ " CONSTRAINT fk_item FOREIGN KEY (" + SYNC_STATUS_ITEM_TABLE_ITEM_ID + ")"
+			+ " REFERENCES " + ITEMS_TABLE + "(" + ITEMS_TABLE_COLUMN_ID + ")"
+			+ " ON DELETE CASCADE"
+			+ ");";
+
+	public static final String SYNC_STATUS_MEDIA_TABLE = "sync_status_media";
+	public static final String SYNC_STATUS_MEDIA_TABLE_MEDIA_ID = "sync_status_media_media_id";
+	public static final String SYNC_STATUS_MEDIA_TABLE_CREATE_SQL =  "create table " + SYNC_STATUS_MEDIA_TABLE + " ("
+			+ SYNC_STATUS_MEDIA_TABLE_MEDIA_ID + " integer primary key, "
+			+ SYNC_STATUS_STATUS + " integer default 0,"
+			+ SYNC_STATUS_LAST_TRY + " text not null, "
+			+ SYNC_STATUS_TRY_COUNT + " integer default 0,"
+			+ " CONSTRAINT fk_media FOREIGN KEY (" + SYNC_STATUS_MEDIA_TABLE_MEDIA_ID + ")"
+			+ " REFERENCES " + ITEM_MEDIA_TABLE + "(" + ITEM_MEDIA_TABLE_COLUMN_ID + ")"
+			+ " ON DELETE CASCADE"
+			+ ");";
+
 	/*
 	private long _databaseId;
 	private long _itemId;
@@ -229,6 +275,18 @@ public class DatabaseHelper extends SQLCipherOpenHelper
 		if (LOGGING)
 			Log.v(LOGTAG, "SQL: " + COMMENTS_TABLE_CREATE_SQL);
 		_sqliteDatabase.execSQL(COMMENTS_TABLE_CREATE_SQL);
+
+		if (LOGGING)
+			Log.v(LOGTAG, "SQL: " + SYNC_STATUS_FEED_TABLE_CREATE_SQL);
+		_sqliteDatabase.execSQL(SYNC_STATUS_FEED_TABLE_CREATE_SQL);
+
+		if (LOGGING)
+			Log.v(LOGTAG, "SQL: " + SYNC_STATUS_ITEM_TABLE_CREATE_SQL);
+		_sqliteDatabase.execSQL(SYNC_STATUS_ITEM_TABLE_CREATE_SQL);
+
+		if (LOGGING)
+			Log.v(LOGTAG, "SQL: " + SYNC_STATUS_MEDIA_TABLE_CREATE_SQL);
+		_sqliteDatabase.execSQL(SYNC_STATUS_MEDIA_TABLE_CREATE_SQL);
 	}
 
 	@Override
@@ -390,6 +448,18 @@ public class DatabaseHelper extends SQLCipherOpenHelper
 		if (newVersion > oldVersion && oldVersion < 6 && newVersion >= 6) {
 			String ITEMS_MEDIA_TABLE_ALTER_SQL = "alter table " + ITEM_MEDIA_TABLE + " add column " + ITEM_MEDIA_GROUP + " integer default 0";
 			_sqliteDatabase.execSQL(ITEMS_MEDIA_TABLE_ALTER_SQL);
+
+			if (LOGGING)
+				Log.v(LOGTAG, "SQL: " + SYNC_STATUS_FEED_TABLE_CREATE_SQL);
+			_sqliteDatabase.execSQL(SYNC_STATUS_FEED_TABLE_CREATE_SQL);
+
+			if (LOGGING)
+				Log.v(LOGTAG, "SQL: " + SYNC_STATUS_ITEM_TABLE_CREATE_SQL);
+			_sqliteDatabase.execSQL(SYNC_STATUS_ITEM_TABLE_CREATE_SQL);
+
+			if (LOGGING)
+				Log.v(LOGTAG, "SQL: " + SYNC_STATUS_MEDIA_TABLE_CREATE_SQL);
+			_sqliteDatabase.execSQL(SYNC_STATUS_MEDIA_TABLE_CREATE_SQL);
 		}
 
 	}

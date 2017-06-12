@@ -7,6 +7,7 @@ import cz.msebera.android.httpclient.client.methods.HttpGet;
 import cz.msebera.android.httpclient.client.protocol.HttpClientContext;
 import cz.msebera.android.httpclient.client.utils.HttpClientUtils;
 import info.guardianproject.securereader.SocialReader;
+import info.guardianproject.securereader.SyncStatus;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -28,7 +29,6 @@ import org.xml.sax.XMLReader;
 import org.xml.sax.helpers.DefaultHandler;
 
 import android.content.res.AssetManager;
-import android.net.Uri;
 import android.util.Log;
 
 /**
@@ -103,7 +103,6 @@ public class Reader
 	public Reader(SocialReader _socialReader, Feed _feed)
 	{
 		socialReader = _socialReader;
-		_feed.setStatus(Feed.STATUS_SYNC_IN_PROGRESS);
 		feed = _feed;
 	}
 
@@ -207,7 +206,7 @@ public class Reader
 
 				Date currentDate = new Date();
 				feed.setNetworkPullDate(currentDate);
-				feed.setStatus(Feed.STATUS_LAST_SYNC_GOOD);
+				feed.setStatus(SyncStatus.OK);
 
 			} else {
 
@@ -216,7 +215,7 @@ public class Reader
 				if (httpClient == null)
 				{
 					//httpclient not init'd yet
-					feed.setStatus(Feed.STATUS_LAST_SYNC_FAILED_UNKNOWN);
+					feed.setStatus(SyncStatus.ERROR_UNKNOWN);
 					return feed;
 				}
 				if (feedUrl != null && !(feedUrl.isEmpty()))
@@ -257,15 +256,15 @@ public class Reader
 
 						Date currentDate = new Date();
 						feed.setNetworkPullDate(currentDate);
-						feed.setStatus(Feed.STATUS_LAST_SYNC_GOOD);
+						feed.setStatus(SyncStatus.OK);
 
 					} else {
 						if (LOGGING)
 							Log.v(LOGTAG,"Response Code: " + response.getStatusLine().getStatusCode());
 						if (response.getStatusLine().getStatusCode() == 404) {
-							feed.setStatus(Feed.STATUS_LAST_SYNC_FAILED_404);
+							feed.setStatus(SyncStatus.ERROR_NOT_FOUND);
 						} else {
-							feed.setStatus(Feed.STATUS_LAST_SYNC_FAILED_UNKNOWN);
+							feed.setStatus(SyncStatus.ERROR_UNKNOWN);
 						}
 					}
 					HttpClientUtils.closeQuietly(response);
@@ -273,10 +272,10 @@ public class Reader
 					if (LOGGING)
 						Log.e(LOGTAG, "Failed to sync feed, bad URL");
 
-					feed.setStatus(Feed.STATUS_LAST_SYNC_FAILED_BAD_URL);
+					feed.setStatus(SyncStatus.ERROR_BAD_URL);
 				}
 			}
-			if (feed.getStatus() == Feed.STATUS_LAST_SYNC_GOOD && socialReader.getFeedPreprocessor() != null) {
+			if (feed.getStatus() == SyncStatus.OK && socialReader.getFeedPreprocessor() != null) {
 				socialReader.getFeedPreprocessor().onFeedParsed(feed);
 			}
 		}
@@ -284,34 +283,34 @@ public class Reader
 		{
 			if (LOGGING) 
 				Log.e("SAX XML", "sax parse error", pce);
-			feed.setStatus(Feed.STATUS_LAST_SYNC_PARSE_ERROR);
+			feed.setStatus(SyncStatus.ERROR_PARSE_ERROR);
 
 		}
 		catch (SAXException se)
 		{
 			if (LOGGING)
 				Log.e("SAX XML", "sax error", se);
-			feed.setStatus(Feed.STATUS_LAST_SYNC_PARSE_ERROR);
+			feed.setStatus(SyncStatus.ERROR_PARSE_ERROR);
 
 		}
 		catch (IOException ioe)
 		{
 			if (LOGGING) 
 				Log.e("SAX XML", "sax parse io error", ioe);
-			feed.setStatus(Feed.STATUS_LAST_SYNC_PARSE_ERROR);
+			feed.setStatus(SyncStatus.ERROR_PARSE_ERROR);
 
 		}
 		catch (IllegalStateException ise)
 		{
 			if (LOGGING)
 				ise.printStackTrace();
-			feed.setStatus(Feed.STATUS_LAST_SYNC_PARSE_ERROR);
+			feed.setStatus(SyncStatus.ERROR_PARSE_ERROR);
 		}
 		catch (Exception e)
 		{
 			if (LOGGING)
 				e.printStackTrace();
-			feed.setStatus(Feed.STATUS_LAST_SYNC_PARSE_ERROR);
+			feed.setStatus(SyncStatus.ERROR_PARSE_ERROR);
 		}
 		return feed;
 	}

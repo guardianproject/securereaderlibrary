@@ -4,29 +4,20 @@ import info.guardianproject.cacheword.CacheWordHandler;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Date;
 import java.util.Locale;
 
 import net.sqlcipher.DatabaseUtils;
 import net.sqlcipher.SQLException;
-import net.sqlcipher.database.SQLiteConstraintException;
 import net.sqlcipher.database.SQLiteDatabase;
 import net.sqlcipher.database.SQLiteDoneException;
 import net.sqlcipher.database.SQLiteTransactionListener;
 
-import android.app.Application;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
-import android.os.Environment;
-import android.provider.ContactsContract;
 import android.util.Log;
 
-import com.google.common.base.Function;
-import com.google.common.base.Joiner;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import com.tinymission.rss.Comment;
 import com.tinymission.rss.Feed;
 import com.tinymission.rss.Item;
@@ -34,7 +25,7 @@ import com.tinymission.rss.MediaContent;
 
 public class DatabaseAdapter
 {
-	public static final boolean LOGGING = false;
+	public static final boolean LOGGING = true;
 	public static final String LOGTAG = "DatabaseAdapter";
 	
 	private final DatabaseHelper databaseHelper;
@@ -126,7 +117,7 @@ public class DatabaseAdapter
 			values.put(DatabaseHelper.FEEDS_TABLE_LANGUAGE, feed.getLanguage());
 			values.put(DatabaseHelper.FEEDS_TABLE_DESCRIPTION, feed.getDescription());
 			values.put(DatabaseHelper.FEEDS_TABLE_LINK, feed.getLink());
-			values.put(DatabaseHelper.FEEDS_TABLE_STATUS, feed.getStatus());
+			values.put(DatabaseHelper.FEEDS_TABLE_STATUS, 0); // TODO - remove this column
 			values.put(DatabaseHelper.FEEDS_TABLE_CATEGORY, feed.getCategory());
 			
 			if (feed.isSubscribed())
@@ -153,8 +144,10 @@ public class DatabaseAdapter
 				values.put(DatabaseHelper.FEEDS_TABLE_PUBLISH_DATE, dateFormat.format(feed.getPubDate()));
 			}
 			
-			if (databaseReady())
+			if (databaseReady()) {
 				returnValue = db.insert(DatabaseHelper.FEEDS_TABLE, null, values);
+				setSyncStatus(feed, feed.getStatus());
+			}
 			// close();
 		}
 		catch (SQLException e)
@@ -279,7 +272,7 @@ public class DatabaseAdapter
 				values.put(DatabaseHelper.FEEDS_TABLE_LANGUAGE, feed.getLanguage());
 				values.put(DatabaseHelper.FEEDS_TABLE_DESCRIPTION, feed.getDescription());
 				values.put(DatabaseHelper.FEEDS_TABLE_LINK, feed.getLink());
-				values.put(DatabaseHelper.FEEDS_TABLE_STATUS, feed.getStatus());
+				values.put(DatabaseHelper.FEEDS_TABLE_STATUS, 0);
 				values.put(DatabaseHelper.FEEDS_TABLE_CATEGORY, feed.getCategory());
 				values.put(DatabaseHelper.FEEDS_TABLE_SUBSCRIBED, feed.isSubscribed() ? 1 : 0);
 				if (feed.getNetworkPullDate() != null) {
@@ -299,6 +292,7 @@ public class DatabaseAdapter
 					returnValue = db.insertOrThrow(DatabaseHelper.FEEDS_TABLE, null, values);
 					feed.setDatabaseId(returnValue);
 				}
+				setSyncStatus(feed, feed.getStatus());
 			} catch (Exception e) {
 				if (LOGGING)
 					e.printStackTrace();
@@ -310,7 +304,7 @@ public class DatabaseAdapter
 	public long addFeed(String title, String feedUrl)
 	{
 		Feed feed = new Feed(title, feedUrl);
-		feed.setStatus(Feed.STATUS_NOT_SYNCED);
+		feed.setStatus(SyncStatus.OK);
 		feed.setSubscribed(true);
 		return addOrUpdateFeed(feed);
 	}
@@ -573,8 +567,7 @@ public class DatabaseAdapter
 					{
 						feed.setSubscribed(false);
 					}
-					
-					feed.setStatus(queryCursor.getInt(statusColumn));
+					feed.setStatus(syncStatus(feed));
 				}
 	
 				queryCursor.close();
@@ -972,9 +965,8 @@ public class DatabaseAdapter
 						{
 							tempFeed.setSubscribed(false);
 						}
-						
-						tempFeed.setStatus(queryCursor.getInt(statusColumn));
-	
+						tempFeed.setStatus(syncStatus(tempFeed));
+
 						feeds.add(tempFeed);
 					}
 					while (queryCursor.moveToNext());
@@ -3382,5 +3374,82 @@ public class DatabaseAdapter
 		if (LOGGING)
 			Log.d(LOGTAG, "Cleaned up "+ numMediaFilesDeleted + " media files");
 		return numMediaFilesDeleted;
+	}
+
+
+	public SyncStatus syncStatus(Object dbObject) {
+		SyncStatus retVal = SyncStatus.OK;
+		ArrayList<String> params = new ArrayList<>();
+		String query = null;
+		if (dbObject instanceof Feed) {
+			Feed feed = (Feed) dbObject;
+			query = "select * from " + DatabaseHelper.SYNC_STATUS_FEED_TABLE
+					+ " where " + DatabaseHelper.SYNC_STATUS_FEED_TABLE_FEED_ID + " = ?;";
+			params.add(String.valueOf(feed.getDatabaseId()));
+		}
+		if (query != null) {
+			Cursor cursor = db.rawQuery(query, params.toArray(new String[0]));
+			if (cursor != null) {
+				try {
+					if (cursor.moveToFirst()) {
+						int statusColumn = cursor.getColumnIndex(DatabaseHelper.SYNC_STATUS_STATUS);
+						int tryCountColumn = cursor.getColumnIndex(DatabaseHelper.SYNC_STATUS_TRY_COUNT);
+						int lastTryColumn = cursor.getColumnIndex(DatabaseHelper.SYNC_STATUS_LAST_TRY);
+
+						long status = cursor.getLong(statusColumn);
+						long tryCount = cursor.getLong(tryCountColumn);
+						Date lastTry = dateFormat.parse(cursor.getString(lastTryColumn));
+						SyncStatus syncStatus = new SyncStatus(status);
+						syncStatus.tryCount = tryCount;
+						syncStatus.lastTry = lastTry;
+						retVal = syncStatus;
+					}
+				} catch (Exception ignored) {}
+				cursor.close();
+			}
+		}
+		return retVal;
+	}
+
+	public void setSyncStatus(Object dbObject, SyncStatus error) {
+		int returnValue = -1;
+
+		ArrayList<String> params = new ArrayList<>();
+		String query = null;
+		if (dbObject instanceof Feed) {
+			Feed feed = (Feed) dbObject;
+			if (error.equals(SyncStatus.OK)) {
+				query = "INSERT OR REPLACE INTO " + DatabaseHelper.SYNC_STATUS_FEED_TABLE
+						+ " VALUES (?, 0, ?, 0)";
+				params.add(String.valueOf(feed.getDatabaseId()));
+				params.add(dateFormat.format(feed.getNetworkPullDate()));
+			} else {
+				query = "INSERT OR REPLACE INTO " + DatabaseHelper.SYNC_STATUS_FEED_TABLE
+						+ " VALUES (?, ?, ?, 1 + COALESCE("
+				+ "(SELECT " + DatabaseHelper.SYNC_STATUS_TRY_COUNT
+						+ " FROM " + DatabaseHelper.SYNC_STATUS_FEED_TABLE
+						+ " WHERE " + DatabaseHelper.SYNC_STATUS_FEED_TABLE_FEED_ID + " = ?"
+						+ " AND " + DatabaseHelper.SYNC_STATUS_STATUS + " != 0"
+						+ "), 0))";
+				params.add(String.valueOf(feed.getDatabaseId()));
+				params.add(String.valueOf(feed.getStatus().Value));
+				params.add(dateFormat.format(new Date()));
+				params.add(String.valueOf(feed.getDatabaseId()));
+			}
+		}
+		if (query != null && databaseReady()) {
+			try {
+				db.execSQL(query, params.toArray(new String[0]));
+			} catch (Exception ignored) {}
+
+			// TEMP TEMP
+			if (LOGGING) {
+				Cursor c = db.query(DatabaseHelper.SYNC_STATUS_FEED_TABLE, null, null, null, null, null, null);
+				if (c != null) {
+					DatabaseUtils.dumpCursor((net.sqlcipher.Cursor) c);
+					c.close();
+				}
+			}
+		}
 	}
 }

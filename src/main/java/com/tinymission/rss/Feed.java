@@ -9,7 +9,7 @@ import java.util.Locale;
 
 import org.xml.sax.Attributes;
 
-import android.util.Log;
+import info.guardianproject.securereader.SyncStatus;
 
 /**
  * Encapsulation of a collection rss items.
@@ -110,15 +110,7 @@ public class Feed extends FeedEntity
 	private long _databaseId = DEFAULT_DATABASE_ID;
 	private Date _networkPullDate;
 	private boolean _subscribed = false;
-	
-	public static int STATUS_NOT_SYNCED = 0;
-	public static int STATUS_LAST_SYNC_GOOD = 1;
-	public static int STATUS_LAST_SYNC_FAILED_404 = 2;
-	public static int STATUS_LAST_SYNC_FAILED_UNKNOWN = 3;
-	public static int STATUS_LAST_SYNC_FAILED_BAD_URL = 4;
-	public static int STATUS_SYNC_IN_PROGRESS = 5;
-	public static int STATUS_LAST_SYNC_PARSE_ERROR = 6;
-	private int _status = 0;
+	private SyncStatus _status = SyncStatus.OK;
 
 	private ArrayList<MediaContent> _mediaContent;
 
@@ -211,11 +203,11 @@ public class Feed extends FeedEntity
 		this._feedURL = _feedURL;
 	}
 
-	public int getStatus() {
+	public SyncStatus getStatus() {
 		return _status;
 	}
 	
-	public void setStatus(int _status) {
+	public void setStatus(SyncStatus _status) {
 		this._status = _status;
 	}
 	

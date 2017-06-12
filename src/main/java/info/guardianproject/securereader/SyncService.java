@@ -21,7 +21,6 @@ import com.tinymission.rss.Feed;
 import com.tinymission.rss.Item;
 import com.tinymission.rss.MediaContent;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
@@ -37,13 +36,15 @@ import java.util.concurrent.TimeUnit;
 
 public class SyncService {
 
-	public static final String BROADCAST_SYNCSERVICE_FEED_DOWNLOADED = "syncservice_feed_downloaded";
-	public static final String BROADCAST_SYNCSERVICE_FEED_ICON_DOWNLOADED = "syncservice_feed_icon_downloaded";
-	public static final String BROADCAST_SYNCSERVICE_MEDIA_DOWNLOADED = "syncservice_media_downloaded";
-	public static final String BROADCAST_SYNCSERVICE_COMMENTS_DOWNLOADED = "syncservice_comments_downloaded";
+	public static final String BROADCAST_SYNCSERVICE_FEED_STATUS = "syncservice_feed_status";
+	public static final String BROADCAST_SYNCSERVICE_FEED_ICON_STATUS = "syncservice_feed_icon_status";
+	public static final String BROADCAST_SYNCSERVICE_MEDIA_STATUS = "syncservice_media_status";
+	public static final String BROADCAST_SYNCSERVICE_COMMENTS_STATUS = "syncservice_comments_status";
+	public static final String EXTRA_SYNCSERVICE_STATUS = "syncservice_extras_status";
 	public static final String EXTRA_SYNCSERVICE_FEED = "syncservice_extras_feed";
 	public static final String EXTRA_SYNCSERVICE_MEDIA = "syncservice_extras_media";
 	public static final String EXTRA_SYNCSERVICE_ITEM = "syncservice_extras_item";
+
 
 	private static final int TASK_FEED_PRIORITY = 5;
 	private static final int TASK_FEED_ICON_PRIORITY = 4;
@@ -143,12 +144,24 @@ public class SyncService {
 			}
 			task = (PrioritizedListenableFutureTask<SyncTaskFeedIconFetcher>) syncServiceExecutorService.submit(new SyncTaskFeedIconFetcher(context, TASK_FEED_ICON_PRIORITY, feed));
 			task.addListener(new PrioritizedTaskListener<SyncTaskFeedIconFetcher>(task) {
+
+				private void sendBroadcast(Feed feed, SyncStatus status) {
+					Intent statusIntent = new Intent(BROADCAST_SYNCSERVICE_FEED_ICON_STATUS);
+					statusIntent.putExtra(EXTRA_SYNCSERVICE_FEED, feed);
+					statusIntent.putExtra(EXTRA_SYNCSERVICE_STATUS, status);
+					LocalBroadcastManager.getInstance(context).sendBroadcast(statusIntent);
+				}
+
 				@Override
 				protected void onSuccess(SyncTaskFeedIconFetcher task) {
-					// Notify listeners
-					Intent feedDownloadedIntent = new Intent(BROADCAST_SYNCSERVICE_FEED_ICON_DOWNLOADED);
-					feedDownloadedIntent.putExtra(EXTRA_SYNCSERVICE_FEED, task.feed);
-					LocalBroadcastManager.getInstance(context).sendBroadcast(feedDownloadedIntent);
+					super.onSuccess(task);
+					sendBroadcast(task.feed, SyncStatus.OK);
+				}
+
+				@Override
+				protected void onFailure(SyncTaskFeedIconFetcher task) {
+					super.onFailure(task);
+					sendBroadcast(task.feed, SyncStatus.ERROR_UNKNOWN);
 				}
 			}, MoreExecutors.directExecutor());
 			return task;
@@ -166,13 +179,19 @@ public class SyncService {
 
 			// Add a listener for the future
 			PrioritizedTaskListener<SyncTaskFeedFetcher> listener = new PrioritizedTaskListener<SyncTaskFeedFetcher>(task) {
+
+				private void sendBroadcast(Feed feed, SyncStatus status) {
+					Intent statusIntent = new Intent(BROADCAST_SYNCSERVICE_FEED_STATUS);
+					statusIntent.putExtra(EXTRA_SYNCSERVICE_FEED, feed);
+					statusIntent.putExtra(EXTRA_SYNCSERVICE_STATUS, status);
+					LocalBroadcastManager.getInstance(context).sendBroadcast(statusIntent);
+				}
+
 				@Override
 				protected void onSuccess(final SyncTaskFeedFetcher task) {
-					// Tell out listeners we are done
-					Intent feedDownloadedIntent = new Intent(BROADCAST_SYNCSERVICE_FEED_DOWNLOADED);
-					feedDownloadedIntent.putExtra(EXTRA_SYNCSERVICE_FEED, task.feed);
-					LocalBroadcastManager.getInstance(context).sendBroadcast(feedDownloadedIntent);
-
+					super.onSuccess(task);
+					// Tell our listeners we are done
+					sendBroadcast(task.feed, task.feed.getStatus());
 					addFeedIconSyncTask(task.feed);
 					SocialReader.getInstance(context).backgroundDownloadFeedItemMedia(task.feed);
 
@@ -189,6 +208,8 @@ public class SyncService {
 
 				@Override
 				protected void onFailure(final SyncTaskFeedFetcher task) {
+					super.onFailure(task);
+					sendBroadcast(task.feed, task.feed.getStatus());
 					handler.post(new Runnable() {
 						@Override
 						public void run() {
@@ -269,14 +290,18 @@ public class SyncService {
 
 			// Add a listener for the future
 			PrioritizedTaskListener<SyncTaskCommentsFetcher> listener = new PrioritizedTaskListener<SyncTaskCommentsFetcher>(task) {
+
+				private void sendBroadcast(Item item, SyncStatus status) {
+					Intent statusIntent = new Intent(BROADCAST_SYNCSERVICE_COMMENTS_STATUS);
+					statusIntent.putExtra(EXTRA_SYNCSERVICE_ITEM, item);
+					statusIntent.putExtra(EXTRA_SYNCSERVICE_STATUS, status);
+					LocalBroadcastManager.getInstance(context).sendBroadcast(statusIntent);
+				}
+
 				@Override
 				protected void onSuccess(final SyncTaskCommentsFetcher task) {
-					// Tell out listeners we are done
-					Intent feedDownloadedIntent = new Intent(BROADCAST_SYNCSERVICE_COMMENTS_DOWNLOADED);
-					feedDownloadedIntent.putExtra(EXTRA_SYNCSERVICE_ITEM, task.item);
-					LocalBroadcastManager.getInstance(context).sendBroadcast(feedDownloadedIntent);
-
-					// Call callback on main thread
+					super.onSuccess(task);
+					sendBroadcast(task.item, task.item.getStatus());
 					handler.post(new Runnable() {
 						@Override
 						public void run() {
@@ -289,6 +314,8 @@ public class SyncService {
 
 				@Override
 				protected void onFailure(final SyncTaskCommentsFetcher task) {
+					super.onFailure(task);
+					sendBroadcast(task.item, task.item.getStatus());
 					handler.post(new Runnable() {
 						@Override
 						public void run() {
@@ -322,12 +349,18 @@ public class SyncService {
 			}
 			task = (PrioritizedListenableFutureTask<SyncTaskMediaFetcher>) syncServiceExecutorService.submit(new SyncTaskMediaFetcher(context, toFront ? TASK_MEDIA_UI_PRIORITY : TASK_MEDIA_PRIORITY, mediaContent));
 			task.addListener(new PrioritizedTaskListener<SyncTaskMediaFetcher>(task) {
+
+				private void sendBroadcast(MediaContent mediaContent, SyncStatus status) {
+					Intent statusIntent = new Intent(BROADCAST_SYNCSERVICE_MEDIA_STATUS);
+					statusIntent.putExtra(EXTRA_SYNCSERVICE_MEDIA, mediaContent);
+					statusIntent.putExtra(EXTRA_SYNCSERVICE_STATUS, status);
+					LocalBroadcastManager.getInstance(context).sendBroadcast(statusIntent);
+				}
+
 				@Override
 				protected void onSuccess(final SyncTaskMediaFetcher task) {
-					// Notify listeners
-					Intent feedDownloadedIntent = new Intent(BROADCAST_SYNCSERVICE_MEDIA_DOWNLOADED);
-					feedDownloadedIntent.putExtra(EXTRA_SYNCSERVICE_MEDIA, task.mediaContent);
-					LocalBroadcastManager.getInstance(context).sendBroadcast(feedDownloadedIntent);
+					super.onSuccess(task);
+					sendBroadcast(task.mediaContent, SyncStatus.OK);
 					if (callback != null) {
 						handler.post(new Runnable() {
 							@Override
@@ -341,6 +374,7 @@ public class SyncService {
 				@Override
 				protected void onFailure(SyncTaskMediaFetcher task) {
 					super.onFailure(task);
+					sendBroadcast(task.mediaContent, SyncStatus.ERROR_UNKNOWN);
 					if (callback != null) {
 						handler.post(new Runnable() {
 							@Override
@@ -523,5 +557,10 @@ public class SyncService {
 
 		protected void onFailure(V task) {
 		}
+	}
+
+	public boolean isFeedSyncing(Feed feed) {
+		PrioritizedListenableFutureTask<SyncTaskFeedFetcher> task = getExistingTask(SyncTaskFeedFetcher.class, feed.getFeedURL());
+		return (task != null);
 	}
 }

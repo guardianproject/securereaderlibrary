@@ -3,15 +3,11 @@ package com.tinymission.rss;
 import cz.msebera.android.httpclient.HttpResponse;
 import cz.msebera.android.httpclient.client.HttpClient;
 import cz.msebera.android.httpclient.client.methods.HttpGet;
-import info.guardianproject.netcipher.client.StrongBuilder;
-import info.guardianproject.netcipher.client.StrongConnectionBuilder;
-import info.guardianproject.netcipher.client.StrongHttpClientBuilder;
 import info.guardianproject.securereader.SocialReader;
+import info.guardianproject.securereader.SyncStatus;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.Stack;
 
@@ -27,8 +23,6 @@ import org.xml.sax.SAXParseException;
 import org.xml.sax.XMLReader;
 import org.xml.sax.helpers.DefaultHandler;
 
-import android.content.res.AssetManager;
-import android.net.Uri;
 import android.util.Log;
 
 /**
@@ -97,7 +91,6 @@ public class CommentReader
 	public CommentReader(SocialReader _socialReader, Item _item)
 	{
 		socialReader = _socialReader;
-		_item.setStatus(Item.STATUS_SYNC_IN_PROGRESS);
 		item = _item;
 	}
 
@@ -174,14 +167,14 @@ public class CommentReader
 						is.close();
 
 						Date currentDate = new Date();
-						item.setStatus(Feed.STATUS_LAST_SYNC_GOOD);
+						item.setStatus(SyncStatus.OK);
 
 					} else {
 						Log.v(LOGTAG, "Response Code: " + response.getStatusLine().getStatusCode());
 						if (response.getStatusLine().getStatusCode() == 404) {
-							item.setStatus(Feed.STATUS_LAST_SYNC_FAILED_404);
+							item.setStatus(SyncStatus.ERROR_NOT_FOUND);
 						} else {
-							item.setStatus(Feed.STATUS_LAST_SYNC_FAILED_UNKNOWN);
+							item.setStatus(SyncStatus.ERROR_UNKNOWN);
 						}
 					}
 
@@ -190,14 +183,14 @@ public class CommentReader
 				{
 					if (LOGGING)
 						Log.e("SAX XML", "sax parse io error", ioe);
-					item.setStatus(Feed.STATUS_LAST_SYNC_PARSE_ERROR);
+					item.setStatus(SyncStatus.ERROR_PARSE_ERROR);
 
 				}
 			} else {
 				if (LOGGING)
 					Log.e(LOGTAG, "Failed to sync feed, bad URL " + item.getCommentsUrl());
 
-				item.setStatus(Feed.STATUS_LAST_SYNC_FAILED_BAD_URL);
+				item.setStatus(SyncStatus.ERROR_BAD_URL);
 			}
 
 	
@@ -207,27 +200,27 @@ public class CommentReader
 		{
 			if (LOGGING) 
 				Log.e("SAX XML", "sax parse error", pce);
-			item.setStatus(Feed.STATUS_LAST_SYNC_PARSE_ERROR);
+			item.setStatus(SyncStatus.ERROR_PARSE_ERROR);
 
 		}
 		catch (SAXException se)
 		{
 			if (LOGGING)
 				Log.e("SAX XML", "sax error", se);
-			item.setStatus(Feed.STATUS_LAST_SYNC_PARSE_ERROR);
+			item.setStatus(SyncStatus.ERROR_PARSE_ERROR);
 
 		}
 		catch (IllegalStateException ise)
 		{
 			if (LOGGING)
 				ise.printStackTrace();
-			item.setStatus(Feed.STATUS_LAST_SYNC_PARSE_ERROR);
+			item.setStatus(SyncStatus.ERROR_PARSE_ERROR);
 		}
 		catch (Exception ise)
 		{
 			if (LOGGING)
 				ise.printStackTrace();
-			item.setStatus(Feed.STATUS_LAST_SYNC_PARSE_ERROR);
+			item.setStatus(SyncStatus.ERROR_PARSE_ERROR);
 		}
 
 		return feed;

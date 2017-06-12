@@ -70,7 +70,6 @@ import android.os.Handler;
 import android.os.Message;
 import android.os.StatFs;
 import android.support.v4.content.LocalBroadcastManager;
-import android.text.Html;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -96,6 +95,7 @@ import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathFactory;
 
 public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnSharedPreferenceChangeListener {
+
 	public interface SocialReaderLockListener
 	{
 		void onLocked();
@@ -1232,6 +1232,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		if (syncService != null) {
 			if (LOGGING)
 				Log.v(LOGTAG,"syncService != null");
+			// TODO - Check errors and backoff info
 			syncService.addFeedSyncTask(feed, callback);
 		} else {
 			if (LOGGING)
@@ -2245,9 +2246,11 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		ArrayList<Feed> subscribedFeeds = getSubscribedFeedsList();
 		for (Feed feed : subscribedFeeds) {
 			debugLog.append(feed.getDatabaseId() + ", " 
-					+ databaseAdapter.getFeedItems(feed.getDatabaseId(), -1).size() + ", "
-					+ feed.getStatus() + ", " +  "\n");
+					+ databaseAdapter.getFeedItems(feed.getDatabaseId(), -1).size() + ", " +  "\n");
 		}
+
+		// TODO - append sync status
+
 		debugLog.append("\n");
 		
 		debugLog.append("Key:\n"
@@ -3049,6 +3052,33 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 			return Uri.parse(SecureShareContentProvider.CONTENT_URI + type + "/" + fileName);
 		} catch (Exception ignored) {
 			return null;
+		}
+	}
+
+	/**
+	 * Get last sync status for database object
+	 * @param dbObject	May be an instance of Item, Feed ...
+	 * @return the status of the object
+	 */
+	public SyncStatus syncStatus(Object dbObject) {
+		if (databaseAdapter != null && databaseAdapter.databaseReady())
+		{
+			return databaseAdapter.syncStatus(dbObject);
+		}
+		return SyncStatus.OK;
+	}
+
+	/**
+	 * Set last sync status for a database object
+	 * @param dbObject	May be an instance of Item, Feed ...
+	 * @param error	The status to set
+	 */
+	public void setSyncStatus(Object dbObject, SyncStatus error) {
+		if (LOGGING)
+			Log.v(LOGTAG, "setSyncStatus for object " + dbObject + " : " + error.toString());
+		if (databaseAdapter != null && databaseAdapter.databaseReady())
+		{
+			databaseAdapter.setSyncStatus(dbObject, error);
 		}
 	}
 }
