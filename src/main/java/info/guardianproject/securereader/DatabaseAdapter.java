@@ -2693,13 +2693,16 @@ public class DatabaseAdapter
 						int statusColumn = cursor.getColumnIndex(DatabaseHelper.SYNC_STATUS_STATUS);
 						int tryCountColumn = cursor.getColumnIndex(DatabaseHelper.SYNC_STATUS_TRY_COUNT);
 						int lastTryColumn = cursor.getColumnIndex(DatabaseHelper.SYNC_STATUS_LAST_TRY);
+						int lastETagColumn = cursor.getColumnIndex(DatabaseHelper.SYNC_STATUS_LAST_ETAG);
 
 						long status = cursor.getLong(statusColumn);
 						long tryCount = cursor.getLong(tryCountColumn);
 						Date lastTry = dateFormat.parse(cursor.getString(lastTryColumn));
+						String lastETag = cursor.isNull(lastETagColumn) ? null : cursor.getString(lastETagColumn);
 						SyncStatus syncStatus = new SyncStatus(status);
 						syncStatus.tryCount = tryCount;
 						syncStatus.lastTry = lastTry;
+						syncStatus.lastETag = lastETag;
 						retVal = syncStatus;
 					}
 				} catch (Exception ignored) {}
@@ -2712,23 +2715,19 @@ public class DatabaseAdapter
 	public void setSyncStatus(Object dbObject, SyncStatus error) {
 		int returnValue = -1;
 
+		String tableName = null;
+		String tableIdColumn = null;
 		ArrayList<String> params = new ArrayList<>();
 		String query = null;
 		if (dbObject instanceof Feed) {
 			Feed feed = (Feed) dbObject;
+			tableName = DatabaseHelper.SYNC_STATUS_FEED_TABLE;
+			tableIdColumn = DatabaseHelper.SYNC_STATUS_FEED_TABLE_FEED_ID;
 			if (error.equals(SyncStatus.OK)) {
-				query = "INSERT OR REPLACE INTO " + DatabaseHelper.SYNC_STATUS_FEED_TABLE
-						+ " VALUES (?, 0, ?, 0)";
 				params.add(String.valueOf(feed.getDatabaseId()));
-				params.add(dateFormat.format(feed.getNetworkPullDate()));
+				params.add(dateFormat.format((feed.getNetworkPullDate() == null) ? new Date() : feed.getNetworkPullDate()));
+				params.add(error.lastETag);
 			} else {
-				query = "INSERT OR REPLACE INTO " + DatabaseHelper.SYNC_STATUS_FEED_TABLE
-						+ " VALUES (?, ?, ?, 1 + COALESCE("
-				+ "(SELECT " + DatabaseHelper.SYNC_STATUS_TRY_COUNT
-						+ " FROM " + DatabaseHelper.SYNC_STATUS_FEED_TABLE
-						+ " WHERE " + DatabaseHelper.SYNC_STATUS_FEED_TABLE_FEED_ID + " = ?"
-						+ " AND " + DatabaseHelper.SYNC_STATUS_STATUS + " != 0"
-						+ "), 0))";
 				params.add(String.valueOf(feed.getDatabaseId()));
 				params.add(String.valueOf(error.Value));
 				params.add(dateFormat.format(new Date()));
@@ -2736,19 +2735,13 @@ public class DatabaseAdapter
 			}
 		} else if (dbObject instanceof Item) {
 			Item item = (Item) dbObject;
+			tableName = DatabaseHelper.SYNC_STATUS_ITEM_TABLE;
+			tableIdColumn = DatabaseHelper.SYNC_STATUS_ITEM_TABLE_ITEM_ID;
 			if (error.equals(SyncStatus.OK)) {
-				query = "INSERT OR REPLACE INTO " + DatabaseHelper.SYNC_STATUS_ITEM_TABLE
-						+ " VALUES (?, 0, ?, 0)";
 				params.add(String.valueOf(item.getDatabaseId()));
 				params.add(dateFormat.format(new Date()));
+				params.add(error.lastETag);
 			} else {
-				query = "INSERT OR REPLACE INTO " + DatabaseHelper.SYNC_STATUS_ITEM_TABLE
-						+ " VALUES (?, ?, ?, 1 + COALESCE("
-						+ "(SELECT " + DatabaseHelper.SYNC_STATUS_TRY_COUNT
-						+ " FROM " + DatabaseHelper.SYNC_STATUS_ITEM_TABLE
-						+ " WHERE " + DatabaseHelper.SYNC_STATUS_ITEM_TABLE_ITEM_ID + " = ?"
-						+ " AND " + DatabaseHelper.SYNC_STATUS_STATUS + " != 0"
-						+ "), 0))";
 				params.add(String.valueOf(item.getDatabaseId()));
 				params.add(String.valueOf(error.Value));
 				params.add(dateFormat.format(new Date()));
@@ -2756,23 +2749,32 @@ public class DatabaseAdapter
 			}
 		} else if (dbObject instanceof MediaContent) {
 			MediaContent mediaContent = (MediaContent) dbObject;
+			tableName = DatabaseHelper.SYNC_STATUS_MEDIA_TABLE;
+			tableIdColumn = DatabaseHelper.SYNC_STATUS_MEDIA_TABLE_MEDIA_ID;
 			if (error.equals(SyncStatus.OK)) {
-				query = "INSERT OR REPLACE INTO " + DatabaseHelper.SYNC_STATUS_MEDIA_TABLE
-						+ " VALUES (?, 0, ?, 0)";
 				params.add(String.valueOf(mediaContent.getDatabaseId()));
 				params.add(dateFormat.format(new Date()));
+				params.add(error.lastETag);
 			} else {
-				query = "INSERT OR REPLACE INTO " + DatabaseHelper.SYNC_STATUS_MEDIA_TABLE
-						+ " VALUES (?, ?, ?, 1 + COALESCE("
-						+ "(SELECT " + DatabaseHelper.SYNC_STATUS_TRY_COUNT
-						+ " FROM " + DatabaseHelper.SYNC_STATUS_MEDIA_TABLE
-						+ " WHERE " + DatabaseHelper.SYNC_STATUS_MEDIA_TABLE_MEDIA_ID + " = ?"
-						+ " AND " + DatabaseHelper.SYNC_STATUS_STATUS + " != 0"
-						+ "), 0))";
 				params.add(String.valueOf(mediaContent.getDatabaseId()));
 				params.add(String.valueOf(error.Value));
 				params.add(dateFormat.format(new Date()));
 				params.add(String.valueOf(mediaContent.getDatabaseId()));
+			}
+		}
+
+		if (tableName != null) {
+			if (error.equals(SyncStatus.OK)) {
+				query = "INSERT OR REPLACE INTO " + tableName
+						+ " VALUES (?, 0, ?, 0, ?)";
+			} else {
+				query = "INSERT OR REPLACE INTO " + tableName
+						+ " VALUES (?, ?, ?, 1 + COALESCE("
+				+ "(SELECT " + DatabaseHelper.SYNC_STATUS_TRY_COUNT
+						+ " FROM " + tableName
+						+ " WHERE " + tableIdColumn + " = ?"
+						+ " AND " + DatabaseHelper.SYNC_STATUS_STATUS + " != 0"
+						+ "), 0), NULL)";
 			}
 		}
 

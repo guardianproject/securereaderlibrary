@@ -177,6 +177,7 @@ public class DatabaseHelper extends SQLCipherOpenHelper
 	public static final String SYNC_STATUS_STATUS = "sync_status_status";
 	public static final String SYNC_STATUS_LAST_TRY = "sync_status_last_try";
 	public static final String SYNC_STATUS_TRY_COUNT = "sync_status_try_count";
+	public static final String SYNC_STATUS_LAST_ETAG = "sync_status_last_etag";
 
 	public static final String SYNC_STATUS_FEED_TABLE = "sync_status_feed";
 	public static final String SYNC_STATUS_FEED_TABLE_FEED_ID = "sync_status_feed_feed_id";
@@ -185,6 +186,7 @@ public class DatabaseHelper extends SQLCipherOpenHelper
 			+ SYNC_STATUS_STATUS + " integer default 0,"
 			+ SYNC_STATUS_LAST_TRY + " text not null, "
 			+ SYNC_STATUS_TRY_COUNT + " integer default 0,"
+			+ SYNC_STATUS_LAST_ETAG + " text,"
 			+ " CONSTRAINT fk_feed FOREIGN KEY (" + SYNC_STATUS_FEED_TABLE_FEED_ID + ")"
 			+ " REFERENCES " + FEEDS_TABLE + "(" + FEEDS_TABLE_COLUMN_ID + ")"
 			+ " ON DELETE CASCADE"
@@ -197,6 +199,7 @@ public class DatabaseHelper extends SQLCipherOpenHelper
 			+ SYNC_STATUS_STATUS + " integer default 0,"
 			+ SYNC_STATUS_LAST_TRY + " text not null, "
 			+ SYNC_STATUS_TRY_COUNT + " integer default 0,"
+			+ SYNC_STATUS_LAST_ETAG + " text,"
 			+ " CONSTRAINT fk_item FOREIGN KEY (" + SYNC_STATUS_ITEM_TABLE_ITEM_ID + ")"
 			+ " REFERENCES " + ITEMS_TABLE + "(" + ITEMS_TABLE_COLUMN_ID + ")"
 			+ " ON DELETE CASCADE"
@@ -209,6 +212,7 @@ public class DatabaseHelper extends SQLCipherOpenHelper
 			+ SYNC_STATUS_STATUS + " integer default 0,"
 			+ SYNC_STATUS_LAST_TRY + " text not null, "
 			+ SYNC_STATUS_TRY_COUNT + " integer default 0,"
+			+ SYNC_STATUS_LAST_ETAG + " text,"
 			+ " CONSTRAINT fk_media FOREIGN KEY (" + SYNC_STATUS_MEDIA_TABLE_MEDIA_ID + ")"
 			+ " REFERENCES " + ITEM_MEDIA_TABLE + "(" + ITEM_MEDIA_TABLE_COLUMN_ID + ")"
 			+ " ON DELETE CASCADE"

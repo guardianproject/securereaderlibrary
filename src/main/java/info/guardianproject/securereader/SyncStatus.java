@@ -18,6 +18,7 @@ public class SyncStatus implements Serializable {
     public long Value;
     public long tryCount;
     public Date lastTry;
+    public String lastETag;
 
     public SyncStatus(long value) {
         Value = value;

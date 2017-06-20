@@ -223,6 +223,12 @@ public class Reader
 					HttpGet httpGet = new HttpGet(feedUrl);
 					httpGet.setHeader("User-Agent", SocialReader.USERAGENT);
 
+					// ETag to send?
+					SyncStatus syncStatus = socialReader.syncStatus(feed);
+					if (syncStatus.lastETag != null) {
+						httpGet.setHeader("If-None-Match", syncStatus.lastETag);
+					}
+
 					if (LOGGING)
 						Log.v(LOGTAG,"Hitting: " + feedUrl);
 
@@ -256,12 +262,21 @@ public class Reader
 
 						Date currentDate = new Date();
 						feed.setNetworkPullDate(currentDate);
-						feed.setStatus(SyncStatus.OK);
+						SyncStatus status = new SyncStatus(SyncStatus.OK.Value);
+						Header ETagHeader = response.getLastHeader("ETag");
+						if (ETagHeader != null) {
+							status.lastETag = ETagHeader.getValue();
+						}
+						feed.setStatus(status);
 
 					} else {
 						if (LOGGING)
 							Log.v(LOGTAG,"Response Code: " + response.getStatusLine().getStatusCode());
-						if (response.getStatusLine().getStatusCode() == 404) {
+						if (response.getStatusLine().getStatusCode() == 304) {
+							// Not updated on server, so no need to update
+							// TODO update sync status with new pull date?
+							return feed;
+						} else if (response.getStatusLine().getStatusCode() == 404) {
 							feed.setStatus(SyncStatus.ERROR_NOT_FOUND);
 						} else {
 							feed.setStatus(SyncStatus.ERROR_UNKNOWN);
