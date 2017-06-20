@@ -45,19 +45,25 @@ public class SyncTaskMediaFetcher extends SyncTask<SyncTaskMediaFetcher> {
 				if (statusCode == HttpStatus.SC_OK) {
 					mediaContent.setFileSize(targetFile.length());
 					mediaContent.setDownloaded(true);
+					mediaContent.setSyncStatus(SyncStatus.OK);
 					getBitmapDimensions(targetFile);
 					SocialReader.getInstance(getContext()).databaseAdapter.addOrUpdateItemMedia(mediaContent);
 				} else {
+					mediaContent.setSyncStatus(SyncStatus.ERROR_UNKNOWN);
+					SocialReader.getInstance(getContext()).databaseAdapter.addOrUpdateItemMedia(mediaContent);
 					throw new Exception("Error downloading");
 				}
 			} else if (!mediaContent.getDownloaded()) {
 				// Exists, but not marked as downloaded. Do that now.
 				mediaContent.setFileSize(targetFile.length());
 				mediaContent.setDownloaded(true);
+				mediaContent.setSyncStatus(SyncStatus.OK);
 				getBitmapDimensions(targetFile);
 				SocialReader.getInstance(getContext()).databaseAdapter.addOrUpdateItemMedia(mediaContent);
 			}
 		} else {
+			mediaContent.setSyncStatus(SyncStatus.ERROR_BAD_URL);
+			SocialReader.getInstance(getContext()).databaseAdapter.addOrUpdateItemMedia(mediaContent);
 			throw new Exception("Invalid URL");
 		}
 		return this;

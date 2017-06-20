@@ -599,136 +599,32 @@ public class DatabaseAdapter
 
 	public Feed getSubscribedFeedItems(int numItems)
 	{
-		Cursor queryCursor = null;
-		Feed feed = new Feed();
-		
-		try
-		{
-			String query = "select " + DatabaseHelper.ITEMS_TABLE_COLUMN_ID + ", " + DatabaseHelper.ITEMS_TABLE_AUTHOR + ", "
-					+ DatabaseHelper.ITEMS_TABLE_CATEGORY + ", " + DatabaseHelper.ITEMS_TABLE_DESCRIPTION + ", " + DatabaseHelper.ITEMS_TABLE_CONTENT_ENCODED
-					+ ", " + DatabaseHelper.ITEMS_TABLE_FAVORITE + ", " + DatabaseHelper.ITEMS_TABLE_GUID + ", " + DatabaseHelper.ITEMS_TABLE_LINK + ", "
-					+ DatabaseHelper.ITEMS_TABLE_SOURCE + ", " + DatabaseHelper.ITEMS_TABLE_TITLE + ", " + DatabaseHelper.ITEMS_TABLE_FEED_ID + ", "
-					+ DatabaseHelper.ITEMS_TABLE_PUBLISH_DATE + ", " + DatabaseHelper.FEEDS_TABLE_COLUMN_ID + ", " + DatabaseHelper.ITEMS_TABLE_SHARED + ", "
-					+ DatabaseHelper.FEEDS_TABLE_TITLE + ", " + DatabaseHelper.FEEDS_TABLE_SUBSCRIBED + ", " + DatabaseHelper.ITEMS_TABLE_REMOTE_POST_ID + ", "
-					+ DatabaseHelper.ITEMS_TABLE_COMMENTS_URL
-					+ " from " + DatabaseHelper.ITEMS_TABLE + ", " + DatabaseHelper.FEEDS_TABLE
-					+ " where " + DatabaseHelper.ITEMS_TABLE_FEED_ID + " = " + DatabaseHelper.FEEDS_TABLE_COLUMN_ID
-					+ " and " + DatabaseHelper.FEEDS_TABLE_SUBSCRIBED + " = ?"
-					+ " order by " + DatabaseHelper.ITEMS_TABLE_PUBLISH_DATE + " DESC"
-					+ " limit " + numItems + ";";
-	
-			if (LOGGING)
-				Log.v(LOGTAG, query);
+		return getItems(-1, Boolean.TRUE, null, null, null, false, numItems);
+	}
 
-			if (databaseReady()) {
-				queryCursor = db.rawQuery(query, new String[] {String.valueOf(1)});
-	
-				int idColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_COLUMN_ID);
-				int authorColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_AUTHOR);
-				int categoryColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_CATEGORY);
-				int descriptionColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_DESCRIPTION);
-				int contentEncodedColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_CONTENT_ENCODED);
-				int favoriteColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_FAVORITE);
-				int sharedColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_SHARED);
-				int guidColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_GUID);
-				int linkColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_LINK);
-				int sourceColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_SOURCE);
-				int titleColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_TITLE);
-				int feedIdColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_FEED_ID);
-				int publishDateColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_PUBLISH_DATE);
-				int remotePostIdColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_REMOTE_POST_ID);
-				int commentsUrlColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_COMMENTS_URL);
-				
-				int feedTableFeedIdColumn = queryCursor.getColumnIndex(DatabaseHelper.FEEDS_TABLE_COLUMN_ID);
-				int feedTableFeedTitle = queryCursor.getColumnIndex(DatabaseHelper.FEEDS_TABLE_TITLE);
-				int feedTableFeedSubscribe = queryCursor.getColumnIndex(DatabaseHelper.FEEDS_TABLE_SUBSCRIBED);
-						
-	
-				if (queryCursor.moveToFirst())
-				{
-					do
-					{
-						int id = queryCursor.getInt(idColumn);
-						String description = queryCursor.getString(descriptionColumn);
-						String contentEncoded = queryCursor.getString(contentEncodedColumn);
-						String title = queryCursor.getString(titleColumn);
-						long feedId = queryCursor.getLong(feedIdColumn);
-						String publishDate = queryCursor.getString(publishDateColumn);
-						String guid = queryCursor.getString(guidColumn);
-	
-						String author = queryCursor.getString(authorColumn);
-						String category = queryCursor.getString(categoryColumn);
-						int favorite = queryCursor.getInt(favoriteColumn);
-						int shared = queryCursor.getInt(sharedColumn);
-						String link = queryCursor.getString(linkColumn);
-						String commentsUrl = queryCursor.getString(commentsUrlColumn);
-						
-						String feedTitle = queryCursor.getString(feedTableFeedTitle);
-						int remotePostId = queryCursor.getInt(remotePostIdColumn);
-	
-						Item item = new Item(guid, title, publishDate, feedTitle, description, feedId);
-						item.setDatabaseId(id);
-						item.setAuthor(author);
-						item.setCategory(category);
-						item.setContentEncoded(contentEncoded);
-						item.dbsetRemotePostId(remotePostId);
-						item.setCommentsUrl(commentsUrl);
-						if (favorite == 1)
-						{
-							item.setFavorite(true);
-						}
-						else
-						{
-							item.setFavorite(false);
-						}
-						if (shared == 1) {
-							item.setShared(true);
-						} else {
-							item.setShared(false);
-						}
-						
-						item.setGuid(guid);
-						item.setLink(link);
-	
+	public Feed getItems(long feedId, Boolean subscribed, Boolean favorited, Boolean shared, String searchPhrase, boolean randomized, int limit) {
+		Feed feed = new Feed();
+
+		Cursor queryCursor = getItemsCursor(feedId, subscribed, favorited, shared, searchPhrase, randomized, limit);
+		if (queryCursor != null) {
+			if (queryCursor.moveToFirst()) {
+				do {
+					Item item = itemFromCursor(queryCursor, queryCursor.getPosition());
+					if (item != null) {
 						feed.addItem(item);
-						
-						if (LOGGING)
-							Log.v(LOGTAG, "Added " + item.getFeedId() + " " + item.getDatabaseId() + " " + item.getTitle() + " " + item.getPubDate());
 					}
-					while (queryCursor.moveToNext());
 				}
-	
+				while (queryCursor.moveToNext());
 				queryCursor.close();
-				
-				for(Item item : feed.getItems())      
-				    item.setMediaContent(getItemMedia(item));
+			}
+			try {
+				queryCursor.close();
+			} catch (Exception e) {
+				if (LOGGING)
+					e.printStackTrace();
 			}
 		}
-		catch (SQLException e)
-		{
-			if (LOGGING)
-				e.printStackTrace();
-		}
-		catch(IllegalStateException e)
-		{
-			if (LOGGING)
-				e.printStackTrace();
-		}
-		finally
-		{
-			if (queryCursor != null)
-			{
-				try
-				{
-					queryCursor.close();					
-				}
-				catch(Exception e) {
-					if (LOGGING)
-						e.printStackTrace();
-				}
-			}
-		}
-		return feed;		
+		return feed;
 	}
 
 	public Cursor getItemsCursor(long feedId, Boolean subscribed, Boolean favorited, Boolean shared, String searchPhrase, boolean randomized, int limit)
@@ -835,7 +731,8 @@ public class DatabaseAdapter
 				String link = queryCursor.getString(linkColumn);
 				String commentsUrl = queryCursor.getString(commentsUrlColumn);
 
-				String feedTitle = queryCursor.getString(feedTableFeedTitle);
+
+				String feedTitle = (feedTableFeedTitle == -1) ? null : queryCursor.getString(feedTableFeedTitle);
 				int remotePostId = queryCursor.getInt(remotePostIdColumn);
 
 				item = new Item(guid, title, publishDate, feedTitle, description, feedId);
@@ -860,6 +757,7 @@ public class DatabaseAdapter
 				item.setLink(link);
 				item.setMediaContent(getItemMedia(item));
 				item.setCategories(getItemTags(item));
+				item.setStatus(syncStatus(item));
 			}
 		} catch (SQLException | IllegalStateException e) {
 			if (LOGGING)
@@ -1017,484 +915,20 @@ public class DatabaseAdapter
 	}
 
 	public Feed getAllFavoriteItems() {
-		Cursor queryCursor = null;
-		Feed feed = new Feed();
-		
-		try
-		{
-			String query = "select " + DatabaseHelper.ITEMS_TABLE_COLUMN_ID + ", " + DatabaseHelper.ITEMS_TABLE_AUTHOR + ", "
-					+ DatabaseHelper.ITEMS_TABLE_CATEGORY + ", " + DatabaseHelper.ITEMS_TABLE_DESCRIPTION + ", " + DatabaseHelper.ITEMS_TABLE_CONTENT_ENCODED
-					+ ", " + DatabaseHelper.ITEMS_TABLE_FAVORITE + ", " + DatabaseHelper.ITEMS_TABLE_GUID + ", " + DatabaseHelper.ITEMS_TABLE_LINK + ", "
-					+ DatabaseHelper.ITEMS_TABLE_SOURCE + ", " + DatabaseHelper.ITEMS_TABLE_TITLE + ", " + DatabaseHelper.ITEMS_TABLE_FEED_ID + ", "
-					+ DatabaseHelper.ITEMS_TABLE_PUBLISH_DATE + ", " + DatabaseHelper.ITEMS_TABLE_SHARED + ", " + DatabaseHelper.ITEMS_TABLE_REMOTE_POST_ID + ", "
-					+ DatabaseHelper.ITEMS_TABLE_COMMENTS_URL
-					+ " from " + DatabaseHelper.ITEMS_TABLE + " where "
-					+ DatabaseHelper.ITEMS_TABLE_FAVORITE + " = ? order by " + DatabaseHelper.ITEMS_TABLE_PUBLISH_DATE + ";";
+		return getItems(-1, null, Boolean.TRUE, null, null, false, 0);
+	}
 
-			if (LOGGING)
-				Log.v(LOGTAG, query);
-
-			if (databaseReady()) {
-				queryCursor = db.rawQuery(query, new String[] {String.valueOf(1)});
-
-				int idColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_COLUMN_ID);
-				int authorColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_AUTHOR);
-				int categoryColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_CATEGORY);
-				int descriptionColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_DESCRIPTION);
-				int contentEncodedColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_CONTENT_ENCODED);
-				int favoriteColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_FAVORITE);
-				int sharedColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_SHARED);
-				int guidColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_GUID);
-				int linkColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_LINK);
-				int sourceColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_SOURCE);
-				int titleColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_TITLE);
-				int feedIdColunn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_FEED_ID);
-				int publishDateColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_PUBLISH_DATE);
-				int remotePostIdColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_REMOTE_POST_ID);
-				int commentsUrlColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_COMMENTS_URL);
-				
-				if (queryCursor.moveToFirst())
-				{
-					do
-					{
-						int id = queryCursor.getInt(idColumn);
-						String description = queryCursor.getString(descriptionColumn);
-						String contentEncoded = queryCursor.getString(contentEncodedColumn);
-						String title = queryCursor.getString(titleColumn);
-						long feedId = queryCursor.getLong(feedIdColunn);
-						String publishDate = queryCursor.getString(publishDateColumn);
-						String guid = queryCursor.getString(guidColumn);
-	
-						String author = queryCursor.getString(authorColumn);
-						String category = queryCursor.getString(categoryColumn);
-						int favorite = queryCursor.getInt(favoriteColumn);
-						int shared = queryCursor.getInt(sharedColumn);
-						String link = queryCursor.getString(linkColumn);
-						String commentsUrl = queryCursor.getString(commentsUrlColumn);
-						int remotePostId = queryCursor.getInt(remotePostIdColumn);
-						
-						Item item = new Item(guid, title, publishDate, getFeedTitle(feedId), description, feedId);
-						item.setDatabaseId(id);
-						item.setAuthor(author);
-						item.setCategory(category);
-						item.setContentEncoded(contentEncoded);
-						if (favorite == 1)
-						{
-							item.setFavorite(true);
-						}
-						else
-						{
-							item.setFavorite(false);
-						}
-						if (shared == 1) {
-							item.setShared(true);
-						} else {
-							item.setShared(false);
-						}
-						
-						item.setGuid(guid);
-						item.setLink(link);
-						item.setCommentsUrl(commentsUrl);
-						
-						item.dbsetRemotePostId(remotePostId);
-	
-						feed.addItem(item);
-					}
-					while (queryCursor.moveToNext());
-				}
-	
-				queryCursor.close();
-				
-				for(Item item : feed.getItems())      
-				    item.setMediaContent(getItemMedia(item));
-			}
-			
-		}
-		catch (SQLException e)
-		{
-			if (LOGGING)
-				e.printStackTrace();
-		}
-		catch(IllegalStateException e)
-		{
-			if (LOGGING)
-				e.printStackTrace();
-		}
-		finally
-		{
-			if (queryCursor != null)
-			{
-				try
-				{
-					queryCursor.close();					
-				}
-				catch(Exception e) {
-					if (LOGGING)
-						e.printStackTrace();
-				}
-			}
-		}
-		return feed;		
-	}	
-	
-	public Feed getFavoriteFeedItems(Feed feed)
-	{
-		Cursor queryCursor = null;
-
-		try
-		{
-			feed.clearItems();
-
-			String query = "select " + DatabaseHelper.ITEMS_TABLE_COLUMN_ID + ", " + DatabaseHelper.ITEMS_TABLE_AUTHOR + ", "
-					+ DatabaseHelper.ITEMS_TABLE_CATEGORY + ", " + DatabaseHelper.ITEMS_TABLE_DESCRIPTION + ", " + DatabaseHelper.ITEMS_TABLE_CONTENT_ENCODED
-					+ ", " + DatabaseHelper.ITEMS_TABLE_FAVORITE + ", " + DatabaseHelper.ITEMS_TABLE_GUID + ", " + DatabaseHelper.ITEMS_TABLE_LINK + ", "
-					+ DatabaseHelper.ITEMS_TABLE_SOURCE + ", " + DatabaseHelper.ITEMS_TABLE_TITLE + ", " + DatabaseHelper.ITEMS_TABLE_FEED_ID + ", "
-					+ DatabaseHelper.ITEMS_TABLE_PUBLISH_DATE + ", " + DatabaseHelper.ITEMS_TABLE_REMOTE_POST_ID + ", "
-					+ DatabaseHelper.ITEMS_TABLE_COMMENTS_URL + 
-					" from " + DatabaseHelper.ITEMS_TABLE + " where " + DatabaseHelper.ITEMS_TABLE_FEED_ID + " = ?"
-					+ " and " + DatabaseHelper.ITEMS_TABLE_FAVORITE + " = ? order by " + DatabaseHelper.ITEMS_TABLE_PUBLISH_DATE + ";";
-
-			if (LOGGING)
-				Log.v(LOGTAG, query);
-
-			if (databaseReady()) {
-				queryCursor = db.rawQuery(query, new String[] {String.valueOf(feed.getDatabaseId()), String.valueOf(1)});
-
-				int idColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_COLUMN_ID);
-				int authorColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_AUTHOR);
-				int categoryColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_CATEGORY);
-				int descriptionColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_DESCRIPTION);
-				int contentEncodedColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_CONTENT_ENCODED);
-				int favoriteColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_FAVORITE);
-				int guidColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_GUID);
-				int linkColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_LINK);
-				int sourceColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_SOURCE);
-				int titleColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_TITLE);
-				int feedIdColunn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_FEED_ID);
-				int publishDateColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_PUBLISH_DATE);
-				int remotePostIdColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_REMOTE_POST_ID);
-				int commentsUrlColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_COMMENTS_URL);
-				
-				if (queryCursor.moveToFirst())
-				{
-					do
-					{
-						int id = queryCursor.getInt(idColumn);
-						String description = queryCursor.getString(descriptionColumn);
-						String contentEncoded = queryCursor.getString(contentEncodedColumn);
-						String title = queryCursor.getString(titleColumn);
-						long feedId = queryCursor.getLong(feedIdColunn);
-						String publishDate = queryCursor.getString(publishDateColumn);
-						String guid = queryCursor.getString(guidColumn);
-	
-						String author = queryCursor.getString(authorColumn);
-						String category = queryCursor.getString(categoryColumn);
-						int favorite = queryCursor.getInt(favoriteColumn);
-						String link = queryCursor.getString(linkColumn);
-						int remotePostId = queryCursor.getInt(remotePostIdColumn);
-						String commentsUrl = queryCursor.getString(commentsUrlColumn);
-						
-						Item item = new Item(guid, title, publishDate, feed.getTitle(), description, feed.getDatabaseId());
-						item.setDatabaseId(id);
-						item.setAuthor(author);
-						item.setCategory(category);
-						item.setContentEncoded(contentEncoded);
-						if (favorite == 1)
-						{
-							item.setFavorite(true);
-						}
-						else
-						{
-							item.setFavorite(false);
-						}
-						item.setGuid(guid);
-						item.setLink(link);
-						item.dbsetRemotePostId(remotePostId);
-						item.setCommentsUrl(commentsUrl);
-	
-						feed.addItem(item);
-					}
-					while (queryCursor.moveToNext());
-				}
-	
-				queryCursor.close();
-	
-				for(Item item : feed.getItems())      
-				    item.setMediaContent(getItemMedia(item));
-			}
-		}
-		catch (SQLException e)
-		{
-			if (LOGGING)
-				e.printStackTrace();
-		}
-		catch(IllegalStateException e)
-		{
-			if (LOGGING)
-				e.printStackTrace();
-		}
-		finally
-		{
-			if (queryCursor != null)
-			{
-				try
-				{
-					queryCursor.close();					
-				}
-				catch(Exception e) {
-					if (LOGGING)
-						e.printStackTrace();
-				}
-			}
-		}		
-
-		return feed;
-
+	public Feed getFavoriteFeedItems(Feed feed) {
+		return getItems(feed.getDatabaseId(), null, Boolean.TRUE, null, null, false, 0);
 	}
 
 	public Feed getAllSharedItems() {
-		Cursor queryCursor = null;
-		Feed feed = new Feed();
-		
-		try
-		{
-			String query = "select " + DatabaseHelper.ITEMS_TABLE_COLUMN_ID + ", " + DatabaseHelper.ITEMS_TABLE_AUTHOR + ", "
-					+ DatabaseHelper.ITEMS_TABLE_CATEGORY + ", " + DatabaseHelper.ITEMS_TABLE_DESCRIPTION + ", " + DatabaseHelper.ITEMS_TABLE_CONTENT_ENCODED
-					+ ", " + DatabaseHelper.ITEMS_TABLE_FAVORITE + ", " + DatabaseHelper.ITEMS_TABLE_GUID + ", " + DatabaseHelper.ITEMS_TABLE_LINK + ", "
-					+ DatabaseHelper.ITEMS_TABLE_SOURCE + ", " + DatabaseHelper.ITEMS_TABLE_TITLE + ", " + DatabaseHelper.ITEMS_TABLE_FEED_ID + ", "
-					+ DatabaseHelper.ITEMS_TABLE_PUBLISH_DATE + ", " + DatabaseHelper.ITEMS_TABLE_SHARED + ", " + DatabaseHelper.ITEMS_TABLE_REMOTE_POST_ID + ", " 
-					+ DatabaseHelper.ITEMS_TABLE_COMMENTS_URL 
-					+ " from " + DatabaseHelper.ITEMS_TABLE + " where "
-					+ DatabaseHelper.ITEMS_TABLE_SHARED + " = ? order by " + DatabaseHelper.ITEMS_TABLE_PUBLISH_DATE + ";";
-
-			if (LOGGING)
-				Log.v(LOGTAG, query);
-
-			if (databaseReady()) {
-				queryCursor = db.rawQuery(query, new String[] {String.valueOf(1)});
-
-				int idColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_COLUMN_ID);
-				int authorColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_AUTHOR);
-				int categoryColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_CATEGORY);
-				int descriptionColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_DESCRIPTION);
-				int contentEncodedColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_CONTENT_ENCODED);
-				int favoriteColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_FAVORITE);
-				int sharedColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_SHARED);
-				int guidColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_GUID);
-				int linkColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_LINK);
-				int sourceColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_SOURCE);
-				int titleColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_TITLE);
-				int feedIdColunn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_FEED_ID);
-				int publishDateColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_PUBLISH_DATE);
-				int remotePostIdColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_REMOTE_POST_ID);
-				int commentsUrlColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_COMMENTS_URL);
-				
-				if (queryCursor.moveToFirst())
-				{
-					do
-					{
-						int id = queryCursor.getInt(idColumn);
-						String description = queryCursor.getString(descriptionColumn);
-						String contentEncoded = queryCursor.getString(contentEncodedColumn);
-						String title = queryCursor.getString(titleColumn);
-						long feedId = queryCursor.getLong(feedIdColunn);
-						String publishDate = queryCursor.getString(publishDateColumn);
-						String guid = queryCursor.getString(guidColumn);
-	
-						String author = queryCursor.getString(authorColumn);
-						String category = queryCursor.getString(categoryColumn);
-						int favorite = queryCursor.getInt(favoriteColumn);
-						int shared = queryCursor.getInt(sharedColumn);
-						String link = queryCursor.getString(linkColumn);
-						int remotePostId = queryCursor.getInt(remotePostIdColumn);
-						String commentsUrl = queryCursor.getString(commentsUrlColumn);
-						
-						Item item = new Item(guid, title, publishDate, feed.getTitle(), description, feed.getDatabaseId());
-						item.setDatabaseId(id);
-						item.setAuthor(author);
-						item.setCategory(category);
-						item.setContentEncoded(contentEncoded);
-						if (favorite == 1)
-						{
-							item.setFavorite(true);
-						}
-						else
-						{
-							item.setFavorite(false);
-						}
-						if (shared == 1) {
-							item.setShared(true);
-						} else {
-							item.setShared(false);
-						}
-						
-						item.setGuid(guid);
-						item.setLink(link);
-						item.dbsetRemotePostId(remotePostId);
-						item.setCommentsUrl(commentsUrl);
-						
-						feed.addItem(item);
-					}
-					while (queryCursor.moveToNext());
-				}
-	
-				queryCursor.close();
-				
-				for(Item item : feed.getItems())      
-				    item.setMediaContent(getItemMedia(item));
-			}
-			
-		}
-		catch (SQLException e)
-		{
-			if (LOGGING)
-				e.printStackTrace();
-		}
-		catch(IllegalStateException e)
-		{
-			if (LOGGING)
-				e.printStackTrace();
-		}
-		finally
-		{
-			if (queryCursor != null)
-			{
-				try
-				{
-					queryCursor.close();					
-				}
-				catch(Exception e) {
-					if (LOGGING)
-						e.printStackTrace();
-				}
-			}
-		}
-		return feed;		
+		return getItems(-1, null, null, Boolean.TRUE, null, false, 0);
 	}
 
-	public Feed getSharedFeedItems(Feed feed)
-	{
-		Cursor queryCursor = null;
-		
-		try
-		{
-			feed.clearItems();
-
-			String query = "select " + DatabaseHelper.ITEMS_TABLE_COLUMN_ID + ", " + DatabaseHelper.ITEMS_TABLE_AUTHOR + ", "
-					+ DatabaseHelper.ITEMS_TABLE_CATEGORY + ", " + DatabaseHelper.ITEMS_TABLE_DESCRIPTION + ", " + DatabaseHelper.ITEMS_TABLE_CONTENT_ENCODED
-					+ ", " + DatabaseHelper.ITEMS_TABLE_FAVORITE + ", " + DatabaseHelper.ITEMS_TABLE_GUID + ", " + DatabaseHelper.ITEMS_TABLE_LINK + ", "
-					+ DatabaseHelper.ITEMS_TABLE_SOURCE + ", " + DatabaseHelper.ITEMS_TABLE_TITLE + ", " + DatabaseHelper.ITEMS_TABLE_FEED_ID + ", "
-					+ DatabaseHelper.ITEMS_TABLE_PUBLISH_DATE + ", " + DatabaseHelper.ITEMS_TABLE_REMOTE_POST_ID + ", "
-					+ DatabaseHelper.ITEMS_TABLE_COMMENTS_URL 
-					+ " from " + DatabaseHelper.ITEMS_TABLE + " where " + DatabaseHelper.ITEMS_TABLE_FEED_ID + " = ?"
-					+ " and " + DatabaseHelper.ITEMS_TABLE_SHARED + " = ? order by " + DatabaseHelper.ITEMS_TABLE_PUBLISH_DATE + ";";
-
-			if (LOGGING)
-				Log.v(LOGTAG, query);
-
-			if (databaseReady()) {
-				queryCursor = db.rawQuery(query, new String[] {String.valueOf(feed.getDatabaseId()), String.valueOf(1)});
-
-				int idColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_COLUMN_ID);
-				int authorColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_AUTHOR);
-				int categoryColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_CATEGORY);
-				int descriptionColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_DESCRIPTION);
-				int contentEncodedColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_CONTENT_ENCODED);
-				int favoriteColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_FAVORITE);
-				int sharedColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_SHARED);
-				int guidColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_GUID);
-				int linkColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_LINK);
-				int sourceColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_SOURCE);
-				int titleColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_TITLE);
-				int feedIdColunn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_FEED_ID);
-				int publishDateColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_PUBLISH_DATE);
-				int remotePostIdColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_REMOTE_POST_ID);
-				int commentsUrlColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_COMMENTS_URL);
-				
-				
-				if (queryCursor.moveToFirst())
-				{
-					do
-					{
-						int id = queryCursor.getInt(idColumn);
-						String description = queryCursor.getString(descriptionColumn);
-						String contentEncoded = queryCursor.getString(contentEncodedColumn);
-						String title = queryCursor.getString(titleColumn);
-						long feedId = queryCursor.getLong(feedIdColunn);
-						String publishDate = queryCursor.getString(publishDateColumn);
-						String guid = queryCursor.getString(guidColumn);
-	
-						String author = queryCursor.getString(authorColumn);
-						String category = queryCursor.getString(categoryColumn);
-						int favorite = queryCursor.getInt(favoriteColumn);
-						int shared = queryCursor.getInt(sharedColumn);
-						String link = queryCursor.getString(linkColumn);
-						int remotePostId = queryCursor.getInt(remotePostIdColumn);
-						String commentsUrl = queryCursor.getString(commentsUrlColumn);
-						
-						Item item = new Item(guid, title, publishDate, feed.getTitle(), description, feed.getDatabaseId());
-						item.setDatabaseId(id);
-						item.setAuthor(author);
-						item.setCategory(category);
-						item.setContentEncoded(contentEncoded);
-						if (favorite == 1)
-						{
-							item.setFavorite(true);
-						}
-						else
-						{
-							item.setFavorite(false);
-						}
-						if (shared == 1) {
-							item.setShared(true);
-						} else {
-							item.setShared(false);
-						}
-						
-						item.setGuid(guid);
-						item.setLink(link);
-						item.dbsetRemotePostId(remotePostId);
-						item.setCommentsUrl(commentsUrl);
-						
-						feed.addItem(item);
-					}
-					while (queryCursor.moveToNext());
-				}
-	
-				queryCursor.close();
-				
-				for(Item item : feed.getItems())      
-				    item.setMediaContent(getItemMedia(item));
-			}
-			
-		}
-		catch (SQLException e)
-		{
-			if (LOGGING)
-				e.printStackTrace();
-		}
-		catch(IllegalStateException e)
-		{
-			if (LOGGING)
-				e.printStackTrace();
-		}
-		finally
-		{
-			if (queryCursor != null)
-			{
-				try
-				{
-					queryCursor.close();					
-				}
-				catch(Exception e) {
-					if (LOGGING)
-						e.printStackTrace();
-				}
-			}
-		}
-		return feed;
-
-	}	
+	public Feed getSharedFeedItems(Feed feed) {
+		return getItems(feed.getDatabaseId(), null, null, Boolean.TRUE, null, false, 0);
+	}
 	
 	/*
 	 * This returns an arraylist of items given a feed id It creates a temp feed
@@ -1515,14 +949,7 @@ public class DatabaseAdapter
 		
 		try
 		{
-			String query = "select " + DatabaseHelper.ITEMS_TABLE_COLUMN_ID + ", " + DatabaseHelper.ITEMS_TABLE_AUTHOR + ", "
-					+ DatabaseHelper.ITEMS_TABLE_CATEGORY + ", " + DatabaseHelper.ITEMS_TABLE_DESCRIPTION + ", "
-					+ DatabaseHelper.ITEMS_TABLE_CONTENT_ENCODED + ", " + DatabaseHelper.ITEMS_TABLE_FAVORITE + ", " + DatabaseHelper.ITEMS_TABLE_SHARED + ", " 
-					+ DatabaseHelper.ITEMS_TABLE_GUID + ", " + DatabaseHelper.ITEMS_TABLE_LINK + ", " + DatabaseHelper.ITEMS_TABLE_SOURCE + ", " 
-					+ DatabaseHelper.ITEMS_TABLE_TITLE + ", " + DatabaseHelper.ITEMS_TABLE_FEED_ID + ", " + DatabaseHelper.ITEMS_TABLE_PUBLISH_DATE + ", "
-					+ DatabaseHelper.ITEMS_TABLE_VIEWCOUNT + ", " + DatabaseHelper.ITEMS_TABLE_REMOTE_POST_ID + ", "
-					+ DatabaseHelper.ITEMS_TABLE_COMMENTS_URL
-					+ " from " + DatabaseHelper.ITEMS_TABLE
+			String query = "select * from " + DatabaseHelper.ITEMS_TABLE
 					+ " where " + DatabaseHelper.ITEMS_TABLE_COLUMN_ID + " = ?;";
 			
 			if (LOGGING)	
@@ -1530,89 +957,19 @@ public class DatabaseAdapter
 			
 			if (databaseReady()) {
 				queryCursor = db.rawQuery(query, new String[] {String.valueOf(itemId)});
-	
-				int idColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_COLUMN_ID);
-				int authorColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_AUTHOR);
-				int categoryColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_CATEGORY);
-				int descriptionColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_DESCRIPTION);
-				int contentEncodedColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_CONTENT_ENCODED);
-				int favoriteColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_FAVORITE);
-				int sharedColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_SHARED);
-				int guidColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_GUID);
-				int linkColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_LINK);
-				int sourceColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_SOURCE);
-				int titleColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_TITLE);
-				int feedIdColunn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_FEED_ID);
-				int publishDateColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_PUBLISH_DATE);
-				int viewCountColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_VIEWCOUNT);
-				int remotePostIdColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_REMOTE_POST_ID);
-				int commentsUrlColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_COMMENTS_URL);
-				
-				if (queryCursor.moveToFirst())
-				{
-					int id = queryCursor.getInt(idColumn);
-					String description = queryCursor.getString(descriptionColumn);
-					String contentEncoded = queryCursor.getString(contentEncodedColumn);
-					String title = queryCursor.getString(titleColumn);
-					long feedId = queryCursor.getLong(feedIdColunn);
-					String publishDate = queryCursor.getString(publishDateColumn);
-					String guid = queryCursor.getString(guidColumn);
-		
-					String author = queryCursor.getString(authorColumn);
-					String category = queryCursor.getString(categoryColumn);
-					int favorite = queryCursor.getInt(favoriteColumn);
-					int shared = queryCursor.getInt(sharedColumn);
-					int viewCount = queryCursor.getInt(viewCountColumn);
-					
-					String source = queryCursor.getString(sourceColumn);
-					String link = queryCursor.getString(linkColumn);
-					String commentsUrl = queryCursor.getString(commentsUrlColumn);
-					
-					int remotePostId = queryCursor.getInt(remotePostIdColumn);
-					
-					returnItem = new Item(guid, title, publishDate, source, description, feedId);
-					returnItem.setDatabaseId(id);
-					returnItem.setAuthor(author);
-					returnItem.setCategory(category);
-					returnItem.setContentEncoded(contentEncoded);
-		
-					if (favorite == 1)
-					{
-						returnItem.setFavorite(true);
+				if (queryCursor != null) {
+					if (queryCursor.moveToFirst()) {
+						returnItem = itemFromCursor(queryCursor, queryCursor.getPosition());
 					}
-					else
-					{
-						returnItem.setFavorite(false);
-					}
-					if (shared == 1) {
-						returnItem.setShared(true);
-					} else {
-						returnItem.setShared(false);
-					}
-					returnItem.setViewCount(viewCount);
-					returnItem.setGuid(guid);
-					returnItem.setLink(link);
-					returnItem.setCommentsUrl(commentsUrl);
-					returnItem.dbsetRemotePostId(remotePostId);
-
-					returnItem.setMediaContent(this.getItemMedia(returnItem));
-					returnItem.setCategories(getItemTags(returnItem));
-					
+					queryCursor.close();
 				}
-				queryCursor.close();
 			}
 		}
-		catch (SQLException e)
+		catch (SQLException | IllegalStateException e)
 		{
 			if (LOGGING)
 				e.printStackTrace();
-		}
-		catch(IllegalStateException e)
-		{
-			if (LOGGING)
-				e.printStackTrace();
-		}
-		finally
+		} finally
 		{
 			if (queryCursor != null)
 			{
@@ -1669,93 +1026,23 @@ public class DatabaseAdapter
 
 			if (databaseReady()) {
 				queryCursor = db.rawQuery(query, new String[] { String.valueOf(feed.getDatabaseId())});
-
-				int idColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_COLUMN_ID);
-				int authorColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_AUTHOR);
-				int categoryColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_CATEGORY);
-				int descriptionColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_DESCRIPTION);
-				int contentEncodedColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_CONTENT_ENCODED);
-				int favoriteColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_FAVORITE);
-				int sharedColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_SHARED);
-				int guidColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_GUID);
-				int linkColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_LINK);
-				int sourceColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_SOURCE);
-				int titleColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_TITLE);
-				int feedIdColunn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_FEED_ID);
-				int publishDateColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_PUBLISH_DATE);
-				int remotePostIdColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_REMOTE_POST_ID);
-				int commentsUrlColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_COMMENTS_URL);
-	
-				if (queryCursor.moveToFirst())
-				{
-					do
-					{
-						int id = queryCursor.getInt(idColumn);
-						String description = queryCursor.getString(descriptionColumn);
-						String contentEncoded = queryCursor.getString(contentEncodedColumn);
-						String title = queryCursor.getString(titleColumn);
-						long feedId = queryCursor.getLong(feedIdColunn);
-						String publishDate = queryCursor.getString(publishDateColumn);
-						String guid = queryCursor.getString(guidColumn);
-	
-						String author = queryCursor.getString(authorColumn);
-						String category = queryCursor.getString(categoryColumn);
-						int favorite = queryCursor.getInt(favoriteColumn);
-						int shared = queryCursor.getInt(sharedColumn);
-	
-						String link = queryCursor.getString(linkColumn);
-						String commentsUrl = queryCursor.getString(commentsUrlColumn);
-						int remotePostId = queryCursor.getInt(remotePostIdColumn);
-						
-						Item item = new Item(guid, title, publishDate, feed.getTitle(), description, feed.getDatabaseId());
-						item.setDatabaseId(id);
-						item.setAuthor(author);
-						item.setCategory(category);
-						item.setContentEncoded(contentEncoded);
-						if (favorite == 1)
-						{
-							item.setFavorite(true);
+				if (queryCursor != null) {
+					if (queryCursor.moveToFirst()) {
+						do {
+							Item item = itemFromCursor(queryCursor, queryCursor.getPosition());
+							feed.addItem(item);
 						}
-						else
-						{
-							item.setFavorite(false);
-						}
-						
-						if (shared == 1) {
-							item.setShared(true);
-						} else {
-							item.setShared(false);
-						}
-	
-						item.setGuid(guid);
-						item.setLink(link);
-						item.setCommentsUrl(commentsUrl);
-						item.dbsetRemotePostId(remotePostId);
-	
-						feed.addItem(item);
+						while (queryCursor.moveToNext());
 					}
-					while (queryCursor.moveToNext());
-					
 					queryCursor.close();
-					
-					for(Item item : feed.getItems()) {
-					    item.setMediaContent(getItemMedia(item));
-					    item.setCategories(getItemTags(item));
-					}
 				}
 			}
 		}
-		catch (SQLException e)
+		catch (SQLException | IllegalStateException e)
 		{
 			if (LOGGING)
 				e.printStackTrace();
-		}
-		catch(IllegalStateException e)
-		{
-			if (LOGGING)
-				e.printStackTrace();
-		}
-		finally
+		} finally
 		{
 			if (queryCursor != null)
 			{
@@ -1825,6 +1112,7 @@ public class DatabaseAdapter
 
 				addOrUpdateItemMedia(item, item.getMediaContent());
 				addOrUpdateItemTags(item);
+				setSyncStatus(item, item.getStatus());
 			} catch (Exception e) {
 				if (LOGGING)
 					e.printStackTrace();
@@ -1932,7 +1220,8 @@ public class DatabaseAdapter
 							downloaded = true;
 						}	
 						mc.setDownloaded(downloaded);
-						
+						mc.setSyncStatus(syncStatus(mc));
+
 						mediaContent.add(mc);
 					} while (queryCursor.moveToNext());
 				}
@@ -2058,7 +1347,7 @@ public class DatabaseAdapter
 						downloaded = true;
 					}	
 					mc.setDownloaded(downloaded);
-					
+					mc.setSyncStatus(syncStatus(mc));
 					returnMC  = mc;
 				}
 	
@@ -2182,6 +1471,7 @@ public class DatabaseAdapter
 					returnValue = db.insertOrThrow(DatabaseHelper.ITEM_MEDIA_TABLE, null, values);
 					itemMedia.setDatabaseId(returnValue);
 				}
+				setSyncStatus(itemMedia, itemMedia.getSyncStatus());
 			} catch (Exception e) {
 				if (LOGGING)
 					e.printStackTrace();
@@ -3384,6 +2674,16 @@ public class DatabaseAdapter
 			query = "select * from " + DatabaseHelper.SYNC_STATUS_FEED_TABLE
 					+ " where " + DatabaseHelper.SYNC_STATUS_FEED_TABLE_FEED_ID + " = ?;";
 			params.add(String.valueOf(feed.getDatabaseId()));
+		} else if (dbObject instanceof Item) {
+			Item item = (Item) dbObject;
+			query = "select * from " + DatabaseHelper.SYNC_STATUS_ITEM_TABLE
+					+ " where " + DatabaseHelper.SYNC_STATUS_ITEM_TABLE_ITEM_ID + " = ?;";
+			params.add(String.valueOf(item.getDatabaseId()));
+		} else if (dbObject instanceof MediaContent) {
+			MediaContent mediaContent = (MediaContent) dbObject;
+			query = "select * from " + DatabaseHelper.SYNC_STATUS_MEDIA_TABLE
+					+ " where " + DatabaseHelper.SYNC_STATUS_MEDIA_TABLE_MEDIA_ID + " = ?;";
+			params.add(String.valueOf(mediaContent.getDatabaseId()));
 		}
 		if (query != null) {
 			Cursor cursor = db.rawQuery(query, params.toArray(new String[0]));
@@ -3430,23 +2730,76 @@ public class DatabaseAdapter
 						+ " AND " + DatabaseHelper.SYNC_STATUS_STATUS + " != 0"
 						+ "), 0))";
 				params.add(String.valueOf(feed.getDatabaseId()));
-				params.add(String.valueOf(feed.getStatus().Value));
+				params.add(String.valueOf(error.Value));
 				params.add(dateFormat.format(new Date()));
 				params.add(String.valueOf(feed.getDatabaseId()));
 			}
+		} else if (dbObject instanceof Item) {
+			Item item = (Item) dbObject;
+			if (error.equals(SyncStatus.OK)) {
+				query = "INSERT OR REPLACE INTO " + DatabaseHelper.SYNC_STATUS_ITEM_TABLE
+						+ " VALUES (?, 0, ?, 0)";
+				params.add(String.valueOf(item.getDatabaseId()));
+				params.add(dateFormat.format(new Date()));
+			} else {
+				query = "INSERT OR REPLACE INTO " + DatabaseHelper.SYNC_STATUS_ITEM_TABLE
+						+ " VALUES (?, ?, ?, 1 + COALESCE("
+						+ "(SELECT " + DatabaseHelper.SYNC_STATUS_TRY_COUNT
+						+ " FROM " + DatabaseHelper.SYNC_STATUS_ITEM_TABLE
+						+ " WHERE " + DatabaseHelper.SYNC_STATUS_ITEM_TABLE_ITEM_ID + " = ?"
+						+ " AND " + DatabaseHelper.SYNC_STATUS_STATUS + " != 0"
+						+ "), 0))";
+				params.add(String.valueOf(item.getDatabaseId()));
+				params.add(String.valueOf(error.Value));
+				params.add(dateFormat.format(new Date()));
+				params.add(String.valueOf(item.getDatabaseId()));
+			}
+		} else if (dbObject instanceof MediaContent) {
+			MediaContent mediaContent = (MediaContent) dbObject;
+			if (error.equals(SyncStatus.OK)) {
+				query = "INSERT OR REPLACE INTO " + DatabaseHelper.SYNC_STATUS_MEDIA_TABLE
+						+ " VALUES (?, 0, ?, 0)";
+				params.add(String.valueOf(mediaContent.getDatabaseId()));
+				params.add(dateFormat.format(new Date()));
+			} else {
+				query = "INSERT OR REPLACE INTO " + DatabaseHelper.SYNC_STATUS_MEDIA_TABLE
+						+ " VALUES (?, ?, ?, 1 + COALESCE("
+						+ "(SELECT " + DatabaseHelper.SYNC_STATUS_TRY_COUNT
+						+ " FROM " + DatabaseHelper.SYNC_STATUS_MEDIA_TABLE
+						+ " WHERE " + DatabaseHelper.SYNC_STATUS_MEDIA_TABLE_MEDIA_ID + " = ?"
+						+ " AND " + DatabaseHelper.SYNC_STATUS_STATUS + " != 0"
+						+ "), 0))";
+				params.add(String.valueOf(mediaContent.getDatabaseId()));
+				params.add(String.valueOf(error.Value));
+				params.add(dateFormat.format(new Date()));
+				params.add(String.valueOf(mediaContent.getDatabaseId()));
+			}
 		}
+
 		if (query != null && databaseReady()) {
 			try {
 				db.execSQL(query, params.toArray(new String[0]));
-			} catch (Exception ignored) {}
+			} catch (Exception ignored) {
+			}
+		}
+	}
 
-			// TEMP TEMP
-			if (LOGGING) {
-				Cursor c = db.query(DatabaseHelper.SYNC_STATUS_FEED_TABLE, null, null, null, null, null, null);
-				if (c != null) {
-					DatabaseUtils.dumpCursor((net.sqlcipher.Cursor) c);
-					c.close();
-				}
+	/* For debugging */
+	private void dumpSyncTable(int type, boolean onlyFailed) {
+		if (LOGGING) {
+			String table = DatabaseHelper.SYNC_STATUS_FEED_TABLE;
+			if (type == 1)
+				table = DatabaseHelper.SYNC_STATUS_ITEM_TABLE;
+			else if (type == 2)
+				table = DatabaseHelper.SYNC_STATUS_MEDIA_TABLE;
+			Cursor c;
+			if (onlyFailed)
+				c = db.query(table, null, DatabaseHelper.SYNC_STATUS_STATUS + " != ?", new String[] { String.valueOf(SyncStatus.OK.Value) } , null, null, null);
+			else
+				c = db.query(table, null, null, null, null, null, null);
+			if (c != null) {
+				DatabaseUtils.dumpCursor((net.sqlcipher.Cursor) c);
+				c.close();
 			}
 		}
 	}

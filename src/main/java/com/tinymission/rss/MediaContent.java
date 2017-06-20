@@ -9,11 +9,13 @@ import org.xml.sax.Attributes;
 import android.text.TextUtils;
 import android.util.Log;
 
+import info.guardianproject.securereader.SyncStatus;
+
 public class MediaContent extends FeedEntity implements Serializable
 {
 	public static final long serialVersionUID = 133703L;
 
-	 public enum MediaContentType { IMAGE, VIDEO, AUDIO, APPLICATION, EPUB, UNKNOWN };
+	public enum MediaContentType { IMAGE, VIDEO, AUDIO, APPLICATION, EPUB, UNKNOWN };
 	 
 	 /* 
 	 * private MediaContentType mType = MediaContentType.IMAGE; private int
@@ -48,6 +50,7 @@ public class MediaContent extends FeedEntity implements Serializable
 	private String lang;
 	private String sampligRate;
 	private int mediaGroup;
+	private SyncStatus status = SyncStatus.OK;
 
 	public MediaContent(Attributes attributes)
 	{
@@ -469,5 +472,12 @@ public class MediaContent extends FeedEntity implements Serializable
 			return false;
 		return getUrl().toLowerCase(Locale.getDefault()).endsWith(extension.toLowerCase(Locale.getDefault()));
 	}
-	
+
+	public SyncStatus getSyncStatus() {
+		return status;
+	}
+
+	public void setSyncStatus(SyncStatus status) {
+		this.status = status;
+	}
 }

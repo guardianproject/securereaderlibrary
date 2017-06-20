@@ -392,8 +392,8 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
     					Log.v(LOGTAG, "App in background and sync frequency set to in background OR App in foreground");
     				
     	        	checkOPML();
-    				//backgroundSyncSubscribedFeeds();
-    				//checkMediaDownloadQueue();
+    				backgroundSyncSubscribedFeeds();
+    				checkMediaDownloadQueue();
     			} else {
     				if (LOGGING)
     					Log.v(LOGTAG, "App in background and sync frequency not set to background");
@@ -429,53 +429,6 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		this.feedPreprocessor = feedPreprocessor;
 	}
 
-//	class SyncServiceConnection implements ServiceConnection {
-//
-//		public boolean isConnected = false;
-//
-//        @Override
-//        public void onServiceConnected(ComponentName className, IBinder service) {
-//            // This is called when the connection with the service has been
-//            // established, giving us the service object we can use to
-//            // interact with the service.  Because we have bound to a explicit
-//            // service that we know is running in our own process, we can
-//            // cast its IBinder to a concrete class and directly access it.
-//        	syncService = ((SyncService.LocalBinder)service).getService();
-//
-//        	if (LOGGING)
-//        		Log.v(LOGTAG,"Connected to SyncService");
-//
-//        	// Add Listener?
-//        	if (syncServiceListener != null) {
-//        		syncService.setSyncServiceListener(syncServiceListener);
-//        		if (LOGGING)
-//        			Log.v(LOGTAG,"added syncServiceListener");
-//        	}
-//
-//    		// Back to the front, check the syncing
-//    		if (settings.syncFrequency() != Settings.SyncFrequency.Manual) {
-//    			backgroundSyncSubscribedFeeds();
-//    		}
-//
-//    		isConnected = true;
-//        }
-//
-//        @Override
-//        public void onServiceDisconnected(ComponentName className) {
-//            // This is called when the connection with the service has been
-//            // unexpectedly disconnected -- that is, its process crashed.
-//            // Because it is running in our same process, we should never
-//            // see this happen.
-//
-//        	syncService = null;
-//
-//        	if (LOGGING)
-//        		Log.v(LOGTAG,"Disconnected from SyncService");
-//
-//        	isConnected = false;
-//        }
-//    };
-
 	private boolean initialized = false;
 	public void initialize() {
 		if (LOGGING)
@@ -492,7 +445,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 
 			initHttpClient(applicationContext);
 
-			syncService = SyncService.getInstance(applicationContext);
+			syncService = SyncService.getInstance(applicationContext, this);
 
             periodicTask = new TimerTask() {
                 @Override
@@ -1233,7 +1186,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 			if (LOGGING)
 				Log.v(LOGTAG,"syncService != null");
 			// TODO - Check errors and backoff info
-			syncService.addFeedSyncTask(feed, callback);
+			syncService.addFeedSyncTask(feed, false, callback);
 		} else {
 			if (LOGGING)
 				Log.v(LOGTAG,"syncService is null!");
@@ -1318,7 +1271,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 			if (isOnline() == ONLINE && syncService != null && talkItem != null && !TextUtils.isEmpty(talkItem.getCommentsUrl())) {
 				if (LOGGING)
 					Log.v(LOGTAG,"Adding talkItem to syncService");
-				syncService.addCommentsSyncTask(talkItem, null);
+				syncService.addCommentsSyncTask(talkItem, false, null);
 			} else if (LOGGING) {
 				Log.v(LOGTAG,"Unable to add talkItem to syncService");
 			}
@@ -1415,7 +1368,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 								if (LOGGING)
 									Log.v(LOGTAG, "Adding to sync " + m.getUrl());
 								
-								syncService.addMediaContentSyncTask(m, null);
+								syncService.addMediaContentSyncTask(m, false, null);
 							}
 						}
 					}
@@ -1459,7 +1412,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 						}
 					}
 				};
-				syncService.addFeedsSyncTask(feeds, callback);
+				syncService.addFeedsSyncTask(feeds, true, callback);
 				return true;
 			}
 		}
@@ -1496,7 +1449,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 					}
 				}
 			};
-			syncService.addFeedSyncTask(feed, callback);
+			syncService.addFeedSyncTask(feed, true, callback);
 			return true;
 		}
 		return false;
@@ -2139,7 +2092,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	{
 		if (settings.syncMode() != Settings.SyncMode.BitWise) {
 			for (MediaContent contentItem : item.getMediaContent()) {
-				syncService.addMediaContentSyncTask(contentItem, null);
+				syncService.addMediaContentSyncTask(contentItem, false, null);
 			}
 		}
 	}
@@ -2575,7 +2528,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 				} else if (download && forceBitwiseDownload && isOnline() == ONLINE) {
 					if (LOGGING)
 						Log.v(LOGTAG, "File doesn't exist, downloading");
-					syncService.addMediaContentSyncTaskToFront(mc, mdc);
+					syncService.addMediaContentSyncTask(mc, true, mdc);
 					return true;
 				}
 				break;
@@ -2945,7 +2898,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 			{
 				Feed dbFeed = databaseAdapter.getFeedItems(_feed, DEFAULT_NUM_FEED_ITEMS);			
 				for (Item item : dbFeed.getItems()) {
-					syncService.addCommentsSyncTask(item, null);
+					syncService.addCommentsSyncTask(item, false, null);
 				}
 			}
 			else
