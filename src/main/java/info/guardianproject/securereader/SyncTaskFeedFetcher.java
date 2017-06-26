@@ -36,8 +36,9 @@ public class SyncTaskFeedFetcher extends SyncTask<SyncTaskFeedFetcher>
 	public SyncTaskFeedFetcher call() throws Exception {
 		SocialReader socialReader = SocialReader.getInstance(getContext());
 		Reader reader = new Reader(socialReader, feed);
-		feed = reader.fetchFeed();
+		Feed feed = reader.fetchFeed();
 		if (feed != null) {
+			this.feed = feed;
 			SocialReader.getInstance(getContext()).setFeedAndItemData(feed);
 		}
 		return this;

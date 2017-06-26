@@ -275,7 +275,7 @@ public class Reader
 						if (response.getStatusLine().getStatusCode() == 304) {
 							// Not updated on server, so no need to update
 							// TODO update sync status with new pull date?
-							return feed;
+							return null;
 						} else if (response.getStatusLine().getStatusCode() == 404) {
 							feed.setStatus(SyncStatus.ERROR_NOT_FOUND);
 						} else {
@@ -290,7 +290,7 @@ public class Reader
 					feed.setStatus(SyncStatus.ERROR_BAD_URL);
 				}
 			}
-			if (feed.getStatus() == SyncStatus.OK && socialReader.getFeedPreprocessor() != null) {
+			if (feed.getStatus().equals(SyncStatus.OK.Value) && socialReader.getFeedPreprocessor() != null) {
 				socialReader.getFeedPreprocessor().onFeedParsed(feed);
 			}
 		}
