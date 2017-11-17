@@ -2,10 +2,11 @@ apply plugin: 'com.android.library'
 
 android {
 
-    compileSdkVersion 25
-    buildToolsVersion "25.0.2"
+    compileSdkVersion 27
+    buildToolsVersion "26.0.2"
 
     defaultConfig {
+        dimension 'default'
         minSdkVersion 14
     }
 
@@ -20,23 +21,27 @@ android {
 dependencies {
 
 
-    compile 'info.guardianproject.iocipher:IOCipher:0.4'
+    implementation 'info.guardianproject.iocipher:IOCipher:0.4'
 
-    compile 'net.zetetic:android-database-sqlcipher:3.5.4@aar'
-    compile 'com.android.support:support-v4:25.3.1'
-    compile 'com.google.guava:guava:20.0'
+    implementation 'net.zetetic:android-database-sqlcipher:3.5.4@aar'
+    implementation 'com.android.support:support-v4:27.0.1'
+    implementation 'com.google.guava:guava:23.0-android'
 
-    compile 'info.guardianproject.cacheword:cachewordlib:0.1.1'
-    compile 'info.guardianproject.netcipher:netcipher:2.0.0-alpha1'
-    compile 'info.guardianproject.netcipher:netcipher-httpclient:2.0.0-alpha1'
-    compile 'cz.msebera.android:httpclient:4.4.1.2'
+    implementation 'info.guardianproject.cacheword:cachewordlib:0.1.1'
+    implementation 'info.guardianproject.netcipher:netcipher:2.0.0-alpha1'
+    implementation 'info.guardianproject.netcipher:netcipher-httpclient:2.0.0-alpha1'
+    implementation 'cz.msebera.android:httpclient:4.4.1.2'
 
-    compile 'apache-codec:commons-codec:1.2'
-    compile 'apache-lang:commons-lang:2.1'
-    compile 'commons-io:commons-io:2.4'
+    implementation 'apache-codec:commons-codec:1.2'
+    implementation 'apache-lang:commons-lang:2.1'
+    implementation 'commons-io:commons-io:2.5'
 
-    compile 'org.jsoup:jsoup:1.9.1'
+    implementation 'org.jsoup:jsoup:1.10.1'
 
-    compile 'org.thoughtcrime.ssl.pinning:AndroidPinning:1.0.0'
+    implementation 'org.thoughtcrime.ssl.pinning:AndroidPinning:1.0.0'
 
+}
+
+repositories {
+    google()
 }
