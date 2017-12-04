@@ -644,6 +644,8 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 				finalOpmlUrl = finalOpmlUrl + "uk_UA";
 			} else if (lang == UiLanguage.Spanish) {
 				finalOpmlUrl = finalOpmlUrl + "es";
+			} else if (lang == UiLanguage.Spanish_US) {
+				finalOpmlUrl = finalOpmlUrl + "es_US";
 			} else if (lang == UiLanguage.Japanese) {
 				finalOpmlUrl = finalOpmlUrl + "ja";
 			} else if (lang == UiLanguage.Norwegian) {

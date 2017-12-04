@@ -429,7 +429,7 @@ public class Settings
 
 	public enum UiLanguage
 	{
-		English, Chinese, Japanese, Norwegian, Spanish, Tibetan, Turkish, Russian, Ukrainian, Farsi, Arabic,
+		English, Chinese, Japanese, Norwegian, Spanish, Spanish_US, Tibetan, Turkish, Russian, Ukrainian, Farsi, Arabic,
 		German
 		//Italian, Swedish, Dutch, Korean, Brazilian Portuguese
 		// I added Arabic, perhaps prematurely
@@ -456,8 +456,13 @@ public class Settings
 			return UiLanguage.Farsi;
 		else if (defaultLanguage.equals("bo"))
 			return UiLanguage.Tibetan;
-		else if (defaultLanguage.equals("es"))
+		else if (defaultLanguage.equals("es")) {
+			String country = Locale.getDefault().getCountry();
+			if (!TextUtils.isEmpty(country) && country.startsWith("US")) {
+				return UiLanguage.Spanish_US;
+			}
 			return UiLanguage.Spanish;
+		}
 		else if (defaultLanguage.equals("ja"))
 			return UiLanguage.Japanese;
 		else if (defaultLanguage.equals("nb"))
