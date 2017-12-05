@@ -430,7 +430,7 @@ public class Settings
 	public enum UiLanguage
 	{
 		English, Chinese, Japanese, Norwegian, Spanish, Spanish_US, Tibetan, Turkish, Russian, Ukrainian, Farsi, Arabic,
-		German
+		German, French
 		//Italian, Swedish, Dutch, Korean, Brazilian Portuguese
 		// I added Arabic, perhaps prematurely
 	}
@@ -477,6 +477,8 @@ public class Settings
 			return UiLanguage.Russian;
 		else if (defaultLanguage.equals("de"))
 			return UiLanguage.German;
+		else if (defaultLanguage.equals("fr"))
+			return UiLanguage.French;
 		return UiLanguage.English;
 	}
 
