@@ -39,6 +39,7 @@ public class OPMLParser {
 	public static final String XMLURL_ATTRIBUTE = "xmlUrl";
 	public static final String SUBSCRIBE_ATTRIBUTE = "subscribe";
 	public static final String DESCRIPTION_ATTRIBUTE = "description";
+	public static final String SITE_ICON_ATTRIBUTE = "site_icon"; // Extension attribute
 	
 	private static final String LOGTAG = "OPMLPARSER";
 	public static final boolean LOGGING = false;
@@ -50,6 +51,7 @@ public class OPMLParser {
 		public boolean subscribe = false;
 		public String description = "";
 		public String category = null;
+		public String icon = null;
 	}
 	
 	ArrayList<OPMLOutline> outlines;
@@ -185,6 +187,7 @@ public class OPMLParser {
 		if (TextUtils.isEmpty(subscribe) || "true".equalsIgnoreCase(subscribe)) {
 			currentOutline.subscribe = true;
 		}
+		currentOutline.icon = outline.getAttribute(SITE_ICON_ATTRIBUTE);
 		if (!TextUtils.isEmpty(currentOutline.xmlUrl)) {
 			if (outlines == null) {
 				outlines = new ArrayList<>();

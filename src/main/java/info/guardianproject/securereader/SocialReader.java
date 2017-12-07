@@ -60,7 +60,9 @@ import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.database.Cursor;
+import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.drawable.BitmapDrawable;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
@@ -71,6 +73,7 @@ import android.os.Message;
 import android.os.StatFs;
 import android.support.v4.content.LocalBroadcastManager;
 import android.text.TextUtils;
+import android.util.Base64;
 import android.util.Log;
 
 import com.tinymission.rss.Feed;
@@ -546,10 +549,31 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 									Feed newFeed = new Feed(outlineElement.text, outlineElement.xmlUrl);
 									newFeed.setDescription(outlineElement.description);
 									newFeed.setSubscribed(outlineElement.subscribe);
-									
 									databaseAdapter.addOrUpdateFeed(newFeed);
 									if (LOGGING)
 										Log.v(LOGTAG,"May have added feed");
+
+									// Save icon if we have it and not previously saved
+									if (!TextUtils.isEmpty(outlineElement.icon)) {
+										File iconFile = new File(socialReader.getFileSystemDir(), SocialReader.FEED_ICON_FILE_PREFIX + newFeed.getDatabaseId());
+										if (!iconFile.exists()) {
+											try {
+												byte[] bytes = Base64.decode(outlineElement.icon, Base64.DEFAULT);
+												OutputStream out = new FileOutputStream(iconFile);
+												InputStream in = new java.io.ByteArrayInputStream(bytes);
+
+												// Transfer bytes from in to out
+												byte[] buf = new byte[8096];
+												int len;
+												while ((len = in.read(buf)) > 0)
+												{
+													out.write(buf, 0, len);
+												}
+												in.close();
+												out.close();
+											} catch (Exception ignored) {}
+										}
+									}
 								}
 							} else {
 								if (LOGGING)
