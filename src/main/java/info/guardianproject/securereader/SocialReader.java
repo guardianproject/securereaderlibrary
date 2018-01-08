@@ -558,19 +558,21 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 										File iconFile = new File(socialReader.getFileSystemDir(), SocialReader.FEED_ICON_FILE_PREFIX + newFeed.getDatabaseId());
 										if (!iconFile.exists()) {
 											try {
-												byte[] bytes = Base64.decode(outlineElement.icon, Base64.DEFAULT);
-												OutputStream out = new FileOutputStream(iconFile);
-												InputStream in = new java.io.ByteArrayInputStream(bytes);
+												if (outlineElement.icon.startsWith("data:") && outlineElement.icon.indexOf(",") > 0) {
+													String imageDataBytes = outlineElement.icon.substring(outlineElement.icon.indexOf(",") + 1);
+													byte[] bytes = Base64.decode(imageDataBytes, Base64.DEFAULT);
+													OutputStream out = new FileOutputStream(iconFile);
+													InputStream in = new java.io.ByteArrayInputStream(bytes);
 
-												// Transfer bytes from in to out
-												byte[] buf = new byte[8096];
-												int len;
-												while ((len = in.read(buf)) > 0)
-												{
-													out.write(buf, 0, len);
+													// Transfer bytes from in to out
+													byte[] buf = new byte[8096];
+													int len;
+													while ((len = in.read(buf)) > 0) {
+														out.write(buf, 0, len);
+													}
+													in.close();
+													out.close();
 												}
-												in.close();
-												out.close();
 											} catch (Exception ignored) {}
 										}
 									}
