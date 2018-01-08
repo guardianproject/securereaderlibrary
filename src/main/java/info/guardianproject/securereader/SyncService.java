@@ -57,7 +57,7 @@ public class SyncService {
 	public static final boolean LOGGING = false;
 
 	// Backoff times in seconds
-	private static final int[] SYNC_ERROR_BACKOFF_TIMES = { 120, 300, 3600, 3600 * 24 };
+	private static final int[] SYNC_ERROR_BACKOFF_TIMES = {120, 300, 3600, 3600 * 24};
 
 	private static SyncService instance;
 
@@ -105,7 +105,7 @@ public class SyncService {
 		syncServiceExecutorQueue.toArray(syncList);
 		synchronized (syncServiceExecutorService) {
 			for (Runnable syncListItem : syncList) {
-				((PrioritizedListenableFutureTask)syncListItem).cancel(true);
+				((PrioritizedListenableFutureTask) syncListItem).cancel(true);
 			}
 			syncServiceExecutorService.purge();
 		}
@@ -431,40 +431,54 @@ public class SyncService {
 		}
 
 		@Override
-		public @NonNull <T> ListenableFuture<T> submit(Callable<T> task) {
+		public @NonNull
+		<T> ListenableFuture<T> submit(Callable<T> task) {
 			final ListenableFuture<T> ret = (ListenableFuture<T>) super.submit(task);
 			if (LOGGING)
 				Log.d(LOGTAG, "Adding " + task.toString() + " to sync. Queue length " + syncServiceExecutorQueue.size());
 			Futures.addCallback(ret, new FutureCallback<T>() {
 				@Override
 				public void onSuccess(Object o) {
-					SyncTask syncTask = ((PrioritizedListenableFutureTask)ret).getTask();
+					SyncTask syncTask = ((PrioritizedListenableFutureTask) ret).getTask();
+					if (LOGGING)
+						Log.d(LOGTAG, syncTask.toString() + " succeeded");
 					syncTask.status = SyncTask.SyncTaskStatus.FINISHED;
 				}
 
 				@Override
 				public void onFailure(Throwable throwable) {
-					SyncTask syncTask = ((PrioritizedListenableFutureTask)ret).getTask();
+					SyncTask syncTask = ((PrioritizedListenableFutureTask) ret).getTask();
 					if (throwable instanceof CancellationException) {
 						if (LOGGING)
 							Log.d(LOGTAG, syncTask.toString() + " was cancelled");
 						syncTask.status = SyncTask.SyncTaskStatus.CANCELLED;
 					} else {
+						if (LOGGING)
+							Log.d(LOGTAG, syncTask.toString() + " failed");
 						syncTask.status = SyncTask.SyncTaskStatus.ERROR;
 					}
 				}
 			});
+			debugQueue();
 			return ret;
 		}
 
 		@Override
-		public @NonNull ListenableFuture<?> submit(Runnable task) {
+		public @NonNull
+		ListenableFuture<?> submit(Runnable task) {
 			throw new RejectedExecutionException("This overload of submit not supported!");
 		}
 
 		@Override
-		public @NonNull <T> ListenableFuture<T> submit(Runnable task, T result) {
+		public @NonNull
+		<T> ListenableFuture<T> submit(Runnable task, T result) {
 			throw new RejectedExecutionException("This overload of submit not supported!");
+		}
+
+		@Override
+		protected void afterExecute(Runnable r, Throwable t) {
+			super.afterExecute(r, t);
+			debugQueue();
 		}
 	}
 
@@ -518,7 +532,7 @@ public class SyncService {
 		}
 
 		SyncTask getTask() {
-			return (SyncTask)callable;
+			return (SyncTask) callable;
 		}
 
 		@Override
@@ -564,10 +578,10 @@ public class SyncService {
 			try {
 				result = Futures.getDone(future);
 			} catch (Exception e) {
-				onFailure((V)future.getTask());
+				onFailure((V) future.getTask());
 				return;
 			}
-			onSuccess((V)future.getTask());
+			onSuccess((V) future.getTask());
 		}
 
 		protected void onSuccess(V task) {
@@ -582,18 +596,57 @@ public class SyncService {
 		return (task != null);
 	}
 
+	public void cancelAllForFeed(Feed feed) {
+		// TODO - implement a feedId in SyncTaskMediaFetcher so we can cancel all those. Also,
+		// we should cancel icon fetch etc. here as well.
+		Runnable[] syncList = new Runnable[syncServiceExecutorQueue.size()];
+		synchronized (syncServiceExecutorService) {
+			syncServiceExecutorQueue.toArray(syncList);
+			for (Runnable syncListItem : syncList) {
+				PrioritizedListenableFutureTask task = (PrioritizedListenableFutureTask) syncListItem;
+				if (task.getTask() instanceof SyncTaskFeedFetcher) {
+					SyncTaskFeedFetcher fetcher = (SyncTaskFeedFetcher) task.getTask();
+					if (fetcher.feed.getFeedURL().equals(feed.getFeedURL())) {
+						task.cancel(true);
+					}
+				}
+			}
+		}
+	}
+
 	private boolean shouldAutoResync(Object object) {
 		SyncStatus status = socialReader.syncStatus(object);
 		if (!status.equals(SyncStatus.OK) && status.tryCount > 0) {
-			int idxBackoff = (int)status.tryCount - 1;
+			int idxBackoff = (int) status.tryCount - 1;
 			idxBackoff = Math.min(idxBackoff, SYNC_ERROR_BACKOFF_TIMES.length - 1);
 			int backoffTime = SYNC_ERROR_BACKOFF_TIMES[idxBackoff] * 1000; // milliseconds
-			if (status.lastTry != null &&  (status.lastTry.getTime() + backoffTime) > new Date().getTime()) {
+			if (status.lastTry != null && (status.lastTry.getTime() + backoffTime) > new Date().getTime()) {
 				if (LOGGING)
 					Log.d(LOGTAG, "shouldAutoResync - false. Item " + object.toString() + " try count " + status.tryCount + " status " + status.Value + " last try at " + status.lastTry);
 				return false; // Wait a bit longer...
 			}
 		}
 		return true;
+	}
+
+	private void debugQueue() {
+		if (LOGGING) {
+			Runnable[] syncList = new Runnable[syncServiceExecutorQueue.size()];
+			synchronized (syncServiceExecutorService) {
+				syncServiceExecutorQueue.toArray(syncList);
+				if (syncList.length == 0) {
+					Log.d(LOGTAG, "SYNC LIST IS EMPTY");
+				} else {
+					Log.d(LOGTAG, "SYNC LIST ---");
+					for (Runnable syncListItem : syncList) {
+						if (syncListItem instanceof PrioritizedListenableFutureTask) {
+							PrioritizedListenableFutureTask listenableFutureTask = (PrioritizedListenableFutureTask) syncListItem;
+							Log.d(LOGTAG, listenableFutureTask.getTask().toString());
+						}
+					}
+					Log.d(LOGTAG, "----");
+				}
+			}
+		}
 	}
 }

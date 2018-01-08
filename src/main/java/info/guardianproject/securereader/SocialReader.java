@@ -1223,16 +1223,32 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	 * Requests feed and feed items to be pulled from the network returns false
 	 * if feed cannot be requested from the network
 	 */
-	private boolean foregroundRequestFeedNetwork(Feed feed, FeedFetcher.FeedFetchedCallback callback)
+	private boolean foregroundRequestFeedNetwork(Feed feed, final FeedFetcher.FeedFetchedCallback _finalCallback)
 	{
-		FeedFetcher feedFetcher = new FeedFetcher(this);
-		feedFetcher.setFeedUpdatedCallback(callback);
-
-		if (isOnline() == ONLINE || feed.getFeedURL().startsWith("file:///"))
+		if (syncService != null && (isOnline() == ONLINE || feed.getFeedURL().startsWith("file:///")))
 		{
-			if (LOGGING)
-				Log.v(LOGTAG, "Calling feedFetcher.execute: " + feed.getFeedURL());
-			feedFetcher.execute(feed);
+			SyncTaskFeedFetcher.SyncTaskFeedFetcherCallback callback = new SyncTaskFeedFetcher.SyncTaskFeedFetcherCallback() {
+				@Override
+				public void feedFetched(Feed _feed) {
+					if (LOGGING)
+						Log.v(LOGTAG, "Manual resync done!");
+					_manualSyncInProgress = false;
+					if (_finalCallback != null) {
+						_finalCallback.feedFetched(_feed);
+					}
+				}
+
+				@Override
+				public void feedFetchError(Feed _feed) {
+					if (LOGGING)
+						Log.v(LOGTAG, "Manual resync failed!");
+					_manualSyncInProgress = false;
+					if (_finalCallback != null) {
+						_finalCallback.feedError(_feed);
+					}
+				}
+			};
+			syncService.addFeedSyncTask(feed, true, callback);
 			return true;
 		}
 		else
@@ -2139,7 +2155,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 			databaseAdapter.addOrUpdateFeed(newFeed);
 			if (callback != null)
 			{
-				foregroundRequestFeedNetwork(newFeed,callback);
+				foregroundRequestFeedNetwork(newFeed, callback);
 			}
 		}
 		else
@@ -2155,6 +2171,9 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		{
 			feed.setSubscribed(true);
 			databaseAdapter.addOrUpdateFeed(feed);
+			if (syncService != null) {
+				syncService.addFeedSyncTask(feed, true, null);
+			}
 		}
 		else
 		{
@@ -2168,6 +2187,9 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	// or do we use the URL-form that's already there, i.e. addFeed(String url)?
 	public void unsubscribeFeed(Feed feed)
 	{
+		if (syncService != null) {
+			syncService.cancelAllForFeed(feed);
+		}
 		if (databaseAdapter != null && databaseAdapter.databaseReady())
 		{
 			feed.setSubscribed(false);
@@ -2182,6 +2204,9 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	}
 
 	public void removeFeed(Feed feed) {
+		if (syncService != null) {
+			syncService.cancelAllForFeed(feed);
+		}
 		if (databaseAdapter != null && databaseAdapter.databaseReady())
 		{
 			feed.setSubscribed(false);
