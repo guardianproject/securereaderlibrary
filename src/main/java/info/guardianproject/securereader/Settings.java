@@ -70,11 +70,6 @@ public class Settings
 
 		mPrefs.edit().putInt(KEY_PASSPHRASE_TIMEOUT, 1440).commit();
 		*/
-
-
-		this.setHasShownHelp(false);
-		this.setHasShownMenuHint(false);
-		this.setHasShownSwipeUpHint(false);
 		
 		mPrefs.edit().putBoolean("firstrunkey", true).commit();
 	}
@@ -189,62 +184,6 @@ public class Settings
 	public void setLaunchPassphrase(String passphrase)
 	{
 		mPrefs.edit().putString("launch_passphrase", passphrase).commit();
-	}
-
-	/**
-	 * @return returns true if we have shown the "swipe up to close story" hint
-	 *         dialog
-	 * 
-	 */
-	public boolean hasShownSwipeUpHint()
-	{
-		return mPrefs.getBoolean("hasshownswipeuphint", false);
-	}
-
-	/**
-	 * Set (or reset) whether we have shown the "swipe up to close story" hint
-	 * dialog.
-	 * 
-	 */
-	public void setHasShownSwipeUpHint(boolean shown)
-	{
-		mPrefs.edit().putBoolean("hasshownswipeuphint", shown).commit();
-	}
-
-	/**
-	 * @return returns true if we have shown the menu hint (bounced it out)
-	 * 
-	 */
-	public boolean hasShownMenuHint()
-	{
-		return mPrefs.getBoolean("hasshownmenuhint", false);
-	}
-
-	/**
-	 * Set (or reset) whether we have shown the menu hint (bounced out)
-	 * 
-	 */
-	public void setHasShownMenuHint(boolean shown)
-	{
-		mPrefs.edit().putBoolean("hasshownmenuhint", shown).commit();
-	}
-
-	/**
-	 * @return returns true if we have shown the help items
-	 * 
-	 */
-	public boolean hasShownHelp()
-	{
-		return mPrefs.getBoolean("hasshownhelpitems", false);
-	}
-	
-	/**
-	 * Set (or reset) whether we have shown the help items
-	 * 
-	 */
-	public void setHasShownHelp(boolean shown)
-	{
-		mPrefs.edit().putBoolean("hasshownhelpitems", shown).commit();
 	}
 
 	/**
