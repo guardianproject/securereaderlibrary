@@ -24,7 +24,6 @@ import info.guardianproject.netcipher.proxy.PsiphonHelper;
 import info.guardianproject.iocipher.*;
 import info.guardianproject.securereader.HTMLRSSFeedFinder.RSSFeed;
 import info.guardianproject.securereader.Settings.ProxyType;
-import info.guardianproject.securereader.Settings.UiLanguage;
 import info.guardianproject.securereader.SyncTaskFeedFetcher.SyncTaskFeedFetcherCallback;
 
 import java.io.BufferedInputStream;
@@ -44,8 +43,10 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.zip.ZipEntry;
@@ -134,9 +135,6 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	public static final int APP_IN_FOREGROUND = 1;
 	public static final int APP_IN_BACKGROUND = 0;
 	public int appStatus = 0;
-
-	public static final int FULL_APP_WIPE = 100;
-	public static final int DATA_WIPE = 101;
 
 	public final static String TOR_PROXY_TYPE = "SOCKS";
 	public final static String TOR_PROXY_HOST = "127.0.0.1";
@@ -383,12 +381,12 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
         	if (LOGGING)
         		Log.v(LOGTAG,"Timer Expired");
 
-    		if (settings.syncFrequency() != Settings.SyncFrequency.Manual) {
+    		if (settings.getCurrentMode().syncFrequency() != ModeSettings.SyncFrequency.Manual) {
     			
     			if (LOGGING)
     				Log.v(LOGTAG, "Sync Frequency not manual");
     			
-    			if ((appStatus == SocialReader.APP_IN_BACKGROUND && settings.syncFrequency() == Settings.SyncFrequency.InBackground)
+    			if ((appStatus == SocialReader.APP_IN_BACKGROUND && settings.getCurrentMode().syncFrequency() == ModeSettings.SyncFrequency.InBackground)
     				|| appStatus == SocialReader.APP_IN_FOREGROUND) {
     				
     				if (LOGGING)
@@ -593,25 +591,20 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		clearMediaDownloadQueue();
 		checkMediaDownloadQueue();
 	}
-	
+
 	private void expireOldContent() {
 		if (LOGGING)
-			Log.v(LOGTAG,"expireOldContent");
-		if (settings.articleExpiration() != Settings.ArticleExpiration.Never) {
-			if (settings.lastItemExpirationCheckTime() < System.currentTimeMillis() - expirationCheckFrequency) {
-				if (LOGGING)
-					Log.v(LOGTAG,"Checking Article Expirations");
-				settings.setLastItemExpirationCheckTime(System.currentTimeMillis());
-				Date expirationDate = new Date(System.currentTimeMillis() - settings.articleExpirationMillis());
-				if (databaseAdapter != null && databaseAdapter.databaseReady())
-					databaseAdapter.deleteExpiredItems(expirationDate);
-			}
-		} else {
+			Log.v(LOGTAG, "expireOldContent");
+		if (settings.lastItemExpirationCheckTime() < System.currentTimeMillis() - expirationCheckFrequency) {
 			if (LOGGING)
-				Log.v(LOGTAG,"Settings set to never expire");
+				Log.v(LOGTAG, "Checking Article Expirations");
+			settings.setLastItemExpirationCheckTime(System.currentTimeMillis());
+			Date expirationDate = new Date(System.currentTimeMillis() - settings.getCurrentMode().articleExpirationMillis());
+			if (databaseAdapter != null && databaseAdapter.databaseReady())
+				databaseAdapter.deleteExpiredItems(expirationDate);
 		}
 	}
-	
+
 	public void checkForRSSFeed(String url) {
 		if (databaseAdapter != null && databaseAdapter.databaseReady() && isOnline() == ONLINE) {
 			HTMLRSSFeedFinder htmlParser = new HTMLRSSFeedFinder(SocialReader.this, url,
@@ -653,35 +646,8 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 			if (LOGGING)
 				Log.v(LOGTAG,"Checking network OPML");
 
-			UiLanguage lang = settings.uiLanguage();
-			String finalOpmlUrl = opmlUrl + "?lang=";
-						
-			if (lang == UiLanguage.Farsi) {
-				finalOpmlUrl = finalOpmlUrl + "fa_IR";
-			} else if (lang == UiLanguage.English) {
-				finalOpmlUrl = finalOpmlUrl + "en_US";
-			} else if (lang == UiLanguage.Tibetan) {
-				finalOpmlUrl = finalOpmlUrl + "bo_CN";
-			} else if (lang == UiLanguage.Chinese) {
-				finalOpmlUrl = finalOpmlUrl + "zh_CN";
-			} else if (lang == UiLanguage.Russian) {
-				finalOpmlUrl = finalOpmlUrl + "ru_RU";
-			} else if (lang == UiLanguage.Ukrainian) {
-				finalOpmlUrl = finalOpmlUrl + "uk_UA";
-			} else if (lang == UiLanguage.Spanish) {
-				finalOpmlUrl = finalOpmlUrl + "es";
-			} else if (lang == UiLanguage.Spanish_US) {
-				finalOpmlUrl = finalOpmlUrl + "es_US";
-			} else if (lang == UiLanguage.Japanese) {
-				finalOpmlUrl = finalOpmlUrl + "ja";
-			} else if (lang == UiLanguage.Norwegian) {
-				finalOpmlUrl = finalOpmlUrl + "nb";
-			} else if (lang == UiLanguage.Turkish) {
-				finalOpmlUrl = finalOpmlUrl + "tr";
-			} else if (lang == UiLanguage.German) {
-				finalOpmlUrl = finalOpmlUrl + "de";
-			}
-			
+			String languageCode = settings.uiLanguage();
+			String finalOpmlUrl = opmlUrl + "?lang=" + languageCode;
 			if (!settings.networkOpmlLoaded()) {
 				finalOpmlUrl += "&first=true";
 			}
@@ -701,7 +667,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 				{
 					connectionType = 1;
 				} 
-				else if (settings.syncNetwork() != Settings.SyncNetwork.WifiOnly) 
+				else if (settings.getCurrentMode().syncData().size() > 0)
 				{
 					// Check any network type
 					networkInfo = connectivityManager.getActiveNetworkInfo();
@@ -714,7 +680,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 				finalOpmlUrl += connectionTypeParam;
 						
 				String proxyTypeParam = "&p=";
-				if (settings.requireProxy() && settings.proxyType() == Settings.ProxyType.Tor) {
+				if (settings.proxyType() == Settings.ProxyType.Tor) {
 					
 					if (torRunning) {
 						proxyTypeParam += "1";
@@ -722,7 +688,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 						proxyTypeParam += "-1";
 					}
 				} 
-				else if (settings.requireProxy() && settings.proxyType() == Settings.ProxyType.Psiphon) 
+				else if (settings.proxyType() == Settings.ProxyType.Psiphon)
 				{
 					if (psiphonRunning) {
 						proxyTypeParam += "2";
@@ -1009,25 +975,44 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		}
 	}
 
+	public Set<ModeSettings.Sync> syncSettingsForCurrentNetwork() {
+		// In mode offline download nothing
+		if (settings.mode() == Settings.Mode.Offline) {
+			return new HashSet<>();
+		}
+		ConnectivityManager connectivityManager = (ConnectivityManager) applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE);
+		NetworkInfo networkInfo = connectivityManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+		if (networkInfo != null && networkInfo.isConnected()) {
+			return settings.getCurrentMode().syncWifi();
+		}
+		return settings.getCurrentMode().syncData();
+	}
+
+
 	// This public method will indicate whether or not the application is online
 	// it takes into account whether or not the application should be online (connectionMode)
 	// as well as the physical network connection and proxy status
 	public int isOnline()
 	{
-		ConnectivityManager connectivityManager = (ConnectivityManager) applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE);
-		NetworkInfo networkInfo;
-
-		if (settings.syncNetwork() == Settings.SyncNetwork.WifiOnly) {
-			networkInfo = connectivityManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
-		} else {
-			networkInfo = connectivityManager.getActiveNetworkInfo();
+		// In mode offline we are always offline
+		if (settings.mode() == Settings.Mode.Offline) {
+			return NOT_ONLINE_NO_WIFI_OR_NETWORK;
 		}
 
-		if (networkInfo != null && networkInfo.isConnectedOrConnecting()) {
-			if (settings.requireProxy() && isProxyOnline()) {
+		// Check wifi/data settings
+		Set<ModeSettings.Sync> syncSettings = syncSettingsForCurrentNetwork();
+		if (syncSettings.size() == 0) {
+			return NOT_ONLINE_NO_WIFI_OR_NETWORK;
+		}
+
+		ConnectivityManager connectivityManager = (ConnectivityManager) applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE);
+		NetworkInfo networkInfo = connectivityManager.getActiveNetworkInfo();
+
+		if (networkInfo != null && networkInfo.isConnected()) {
+			if (settings.proxyType() != ProxyType.None && isProxyOnline()) {
 				return ONLINE;
 			}
-			else if (settings.requireProxy())
+			else if (settings.proxyType() != ProxyType.None)
 			{
 				// Either the proxy isn't connected or they haven't selected one yet which happens during onboarding
 				return NOT_ONLINE_NO_PROXY;
@@ -1038,18 +1023,13 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 			}
 		} else {
 			// Network not connected
-			if (settings.syncNetwork() == Settings.SyncNetwork.WifiOnly) {
-				return NOT_ONLINE_NO_WIFI;
-			}
-			else {
-				return NOT_ONLINE_NO_WIFI_OR_NETWORK;
-			}
+			return NOT_ONLINE_NO_WIFI_OR_NETWORK;
 		}
 	}
 
 	// Working hand in hand with isOnline this tells other classes whether or not they should use a proxy when connecting
 	public boolean useProxy() {
-		if (settings.requireProxy()) {
+		if (settings.proxyType() != ProxyType.None) {
 			if (LOGGING)
 				Log.v(LOGTAG, "USE Proxy");
 			return true;
@@ -1089,7 +1069,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		if (LOGGING) {
 			Log.v(LOGTAG, "Checking Proxy");
 			
-			if (settings.requireProxy()) {
+			if (settings.proxyType() != ProxyType.None) {
 				Log.v(LOGTAG, "Require Proxy is True");
 			} else {
 				Log.v(LOGTAG, "Require Proxy is False");
@@ -1353,9 +1333,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		if (LOGGING) 
 			Log.v(LOGTAG, "clearMediaDownloadQueue");		
 		
-		if (!cacheWord.isLocked() && isOnline() == ONLINE && 
-				settings.syncMode() != Settings.SyncMode.BitWise
-				&& syncService != null) {
+		if (!cacheWord.isLocked() && isOnline() == ONLINE && syncService != null) {
 				
 			syncService.cancelAll();
 			backgroundSyncSubscribedFeeds();
@@ -1367,9 +1345,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		if (LOGGING) 
 			Log.v(LOGTAG, "checkMediaDownloadQueue");		
 		
-		if (!cacheWord.isLocked() && 
-				settings.syncMode() != Settings.SyncMode.BitWise
-				&& syncService != null) {
+		if (!cacheWord.isLocked() && syncService != null && syncSettingsForCurrentNetwork().contains(ModeSettings.Sync.Media)) {
 			
 			if (LOGGING) 
 				Log.v(LOGTAG, "In right state, definitely checkMediaDownloadQueue");
@@ -2134,7 +2110,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	
 	public void backgroundDownloadItemMedia(Item item)
 	{
-		if (settings.syncMode() != Settings.SyncMode.BitWise) {
+		if (syncSettingsForCurrentNetwork().contains(ModeSettings.Sync.Media)) {
 			for (MediaContent contentItem : item.getMediaContent()) {
 				syncService.addMediaContentSyncTask(contentItem, false, null);
 			}
@@ -2358,27 +2334,20 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		return sendIntent;
 	}
 
-	public void doWipe(int wipeMethod)
+	public void doWipe(Settings.PanicAction action)
 	{
 		if (LOGGING)
 			Log.v(LOGTAG, "doing doWipe()");
 
-		if (wipeMethod == DATA_WIPE)
+		if (action == Settings.PanicAction.WipeData)
 		{
 			dataWipe();
 		}
-		else if (wipeMethod == FULL_APP_WIPE)
+		else if (action == Settings.PanicAction.Uninstall)
 		{
 			dataWipe();
 			deleteApp();
 		}
-		else
-		{
-			if (LOGGING)
-				Log.v(LOGTAG, "This shouldn't happen");
-		}
-
-		//applicationContext.finish();
 	}
 
 	public void lockApp()
@@ -2566,7 +2535,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	public boolean loadMediaContent(MediaContent mc, final SyncTaskMediaFetcher.SyncTaskMediaFetcherCallback mdc, boolean download, boolean forceBitwiseDownload) {
 		switch (mc.getMediaContentType()) {
 			case IMAGE:
-				forceBitwiseDownload = forceBitwiseDownload || (settings.syncMode() != Settings.SyncMode.BitWise);
+				forceBitwiseDownload = forceBitwiseDownload || (syncSettingsForCurrentNetwork().contains(ModeSettings.Sync.Media));
 				// Allow to fall through
 			case EPUB:
 			case VIDEO:
@@ -3003,7 +2972,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
 		// If we enable a proxy, make sure to update status
 		//
-		if ((Settings.KEY_REQUIRE_PROXY.equals(key) || Settings.KEY_PROXY_TYPE.equals(key)) && settings.requireProxy()) {
+		if (Settings.KEY_PROXY_TYPE.equals(key)) {
 			if (settings.proxyType() == ProxyType.Tor)
 				checkTorStatus();
 			else if (settings.proxyType() == ProxyType.Psiphon)

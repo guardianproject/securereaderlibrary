@@ -47,6 +47,8 @@ public class SyncService {
 	public static final String EXTRA_SYNCSERVICE_ITEM = "syncservice_extras_item";
 
 
+	//private static final String PRIORITY_SCHEME = ""
+
 	private static final int TASK_FEED_PRIORITY = 5;
 	private static final int TASK_FEED_ICON_PRIORITY = 4;
 	private static final int TASK_MEDIA_PRIORITY = 3;

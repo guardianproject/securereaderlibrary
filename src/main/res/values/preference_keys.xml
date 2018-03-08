@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pref_key_mode">mode</string>
+    <string name="pref_key_mode_optimized">Optimized</string>
+    <string name="pref_key_mode_everything">Everything</string>
+    <string name="pref_key_mode_offline">Offline</string>
+
+    <string name="pref_key_security_proxy">proxy_type</string>
+    <string name="pref_key_security_proxy_none">None</string>
+    <string name="pref_key_security_proxy_tor">Tor</string>
+    <string name="pref_key_security_proxy_psiphon">Psiphon</string>
+
+    <string name="pref_key_panic_action">panic_action</string>
+    <string name="pref_key_panic_action_wipedata">WipeData</string>
+    <string name="pref_key_panic_action_uninstall">Uninstall</string>
+
+    <string name="pref_key_language">language</string>
+
+    <!-- Mode keys -->
+    <string name="pref_key_sync_frequency">sync_frequency</string>
+    <string name="pref_key_sync_frequency_manual">Manual</string>
+    <string name="pref_key_sync_frequency_whenrunning">WhenRunning</string>
+    <string name="pref_key_sync_frequency_inbackground">InBackground</string>
+
+    <string name="pref_key_sync_over_wifi">sync_over_wifi</string>
+    <string name="pref_key_sync_over_data">sync_over_data</string>
+    <string name="pref_key_sync_summaries">Summary</string>
+    <string name="pref_key_sync_full_text">FullText</string>
+    <string name="pref_key_sync_media">Media</string>
+    <string name="pref_key_sync_media_rich">sync_media_rich</string>
+    <string name="pref_key_article_expiration">article_expiration</string>
+    <string name="pref_key_article_expiration_afterread">AfterRead</string>
+    <string name="pref_key_article_expiration_oneday">OneDay</string>
+    <string name="pref_key_article_expiration_oneweek">OneWeek</string>
+    <string name="pref_key_save_power_enabled">save_power</string>
+    <string name="pref_key_save_power_percentage">save_power_percentage</string>
+
+</resources>

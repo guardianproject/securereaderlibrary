@@ -47,14 +47,38 @@
 	<string name="xmlrpc_endpoint_cert_pin"></string>
 
 	<!-- Default values that should be referenced in Settings.java -->
-	<bool name="require_proxy_default">true</bool>
-	<string name="article_expiration_default">Never</string>
-	<string name="default_proxy_type">Tor</string>
-	<string name="sync_mode_default">BitWise</string>	
+	<string name="pref_default_mode">@string/pref_key_mode_optimized</string>
+	<string name="pref_default_security_proxy">@string/pref_key_security_proxy_tor</string>
+	<string name="pref_default_panic_action">@string/pref_key_panic_action_wipedata</string>
+
+	<string name="pref_default_optimized_sync_frequency">@string/pref_key_sync_frequency_inbackground</string>
+	<string-array name="pref_default_optimized_sync_over_wifi">
+		<item>@string/pref_key_sync_summaries</item>
+	</string-array>
+	<string-array name="pref_default_optimized_sync_over_data">
+		<item>@string/pref_key_sync_summaries</item>
+	</string-array>
+	<bool name="pref_default_optimized_media_rich">false</bool>
+	<string name="pref_default_optimized_article_expiration">@string/pref_key_article_expiration_afterread</string>
+	<bool name="pref_default_optimized_save_power_enabled">true</bool>
+	<integer name="pref_default_optimized_save_power_percentage">20</integer>
+
+	<string name="pref_default_everything_sync_frequency">@string/pref_key_sync_frequency_inbackground</string>
+	<string-array name="pref_default_everything_sync_over_wifi">
+		<item>@string/pref_key_sync_summaries</item>
+	</string-array>
+	<string-array name="pref_default_everything_sync_over_data">
+		<item>@string/pref_key_sync_summaries</item>
+	</string-array>
+	<bool name="pref_default_everything_media_rich">true</bool>
+	<string name="pref_default_everything_article_expiration">@string/pref_key_article_expiration_oneweek</string>
+	<bool name="pref_default_everything_save_power_enabled">false</bool>
+	<integer name="pref_default_everything_save_power_percentage">20</integer>
+
+	<string name="article_expiration_default">OneDay</string>
+	<string name="sync_mode_default">BitWise</string>
 	<string name="sync_network_default">WifiAndMobile</string>
-	<string name="sync_frequency_default">InBackground</string>
-	<bool name="wipe_app_default">false</bool>
-	
+
 	<!-- Limit number of items to keep in database -1 for no limit -->
 	<integer name="item_limit">-1</integer>
 	
@@ -63,4 +87,5 @@
 
 	<!-- Relaxed HTTPS checking -->
 	<bool name="relaxed_https">false</bool>
+
 </resources>

@@ -1,21 +1,40 @@
 package info.guardianproject.securereader;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
+import android.annotation.SuppressLint;
+import android.app.Application;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.res.TypedArray;
 import android.preference.PreferenceManager;
 import android.text.TextUtils;
 import android.util.Log;
+
+import com.google.common.collect.Lists;
+
+import static info.guardianproject.securereader.Settings.Mode.Everything;
 
 public class Settings
 {
 	public static final String LOGTAG = "Settings";
 	public static final boolean LOGGING = false;
-	
+
+	private static final int CURRENT_SETTINGS_VERSION = 1;
+	private static final String KEY_SETTINGS_VERSION = "settings_version";
+
+	protected final Context context;
 	protected final SharedPreferences mPrefs;
-	private final boolean mIsFirstRun;
-	private final Context context;
+	protected ModeSettings currentMode;
+	protected ModeSettings modeOptimized;
+	protected ModeSettings modeEverything;
+	protected ModeSettings modeOffline;
 
 	// Use these constants when listening to changes, to see what property has
 	// changed!
@@ -24,56 +43,95 @@ public class Settings
 	public static final String KEY_LOCAL_OPML_LOADED = "local_opml_loaded";
 	public static final String KEY_LAST_ITEM_EXPIRATION_CHECK_TIME = "last_item_expiration_check_time";
 	public static final String KEY_LAST_OPML_CHECK_TIME = "last_opml_check_time";
-	public static final String KEY_REQUIRE_TOR = "require_tor";
-	public static final String KEY_PASSPHRASE_TIMEOUT = "passphrase_timeout";
-	public static final String KEY_CONTENT_FONT_SIZE_ADJUSTMENT = "content_font_size_adjustment";
-	public static final String KEY_WIPE_APP = "wipe_app";
-	public static final String KEY_ARTICLE_EXPIRATION = "article_expiration";
-	public static final String KEY_SYNC_MODE = "sync_mode";
-	public static final String KEY_SYNC_FREQUENCY = "sync_frequency";
-	public static final String KEY_SYNC_NETWORK = "sync_network";
-	public static final String KEY_READER_SWIPE_DIRECTION = "reader_swipe_direction";
-	public static final String KEY_UI_LANGUAGE = "ui_language";
-	public static final String KEY_PASSWORD_ATTEMPTS = "num_password_attempts";
 	public static final String KEY_CURRENT_PASSWORD_ATTEMPTS = "num_current_password_attempts";
 	public static final String KEY_ACCEPTED_POST_PERMISSION = "accepted_post_permission";
 	public static final String KEY_XMLRPC_USERNAME = "xmlrpc_username";
 	public static final String KEY_XMLRPC_PASSWORD = "xmlrpc_password";
-	public static final String KEY_USE_KILL_PASSPHRASE = "use_passphrase";
-	public static final String KEY_KILL_PASSPHRASE = "passphrase";
 	public static final String KEY_CHAT_SECURE_DIALOG_SHOWN = "chat_secure_dialog_shown";
 	public static final String KEY_CHAT_SECURE_INFO_SHOWN = "chat_secure_info_shown";
 	public static final String KEY_USERNAME_PASSWORD_CHAT_REGISTERED = "chat_username_password_registered";
 	public static final String KEY_DOWNLOAD_EPUB_READER_DIALOG_SHOWN = "download_epub_reader_dialog_shown";
-	public static final String KEY_REQUIRE_PROXY = "require_proxy";
-	public static final String KEY_PROXY_TYPE = "proxy_type"; 
-	
-	public Settings(Context _context)
+
+	public static final String KEY_REQUIRE_TOR = "require_tor";
+	public static final String KEY_PASSPHRASE_TIMEOUT = "passphrase_timeout";
+	public static final String KEY_ARTICLE_EXPIRATION = "article_expiration";
+	public static final String KEY_SYNC_NETWORK = "sync_network";
+	public static final String KEY_PASSWORD_ATTEMPTS = "num_password_attempts";
+	public static final String KEY_USE_KILL_PASSPHRASE = "use_passphrase";
+	public static final String KEY_KILL_PASSPHRASE = "passphrase";
+
+	public static String KEY_MODE;
+	public static String KEY_PROXY_TYPE;
+	public static String KEY_PANIC_ACTION;
+	public static String KEY_UI_LANGUAGE;
+
+	public Settings(Context context)
 	{
-		context = _context;
-		
+		this.context = context;
+
+		KEY_MODE = context.getString(R.string.pref_key_mode);
+		KEY_PROXY_TYPE = context.getString(R.string.pref_key_security_proxy);
+		KEY_PANIC_ACTION = context.getString(R.string.pref_key_panic_action);
+		KEY_UI_LANGUAGE = context.getString(R.string.pref_key_language);
+
 		mPrefs = PreferenceManager.getDefaultSharedPreferences(context);
-		
-		mIsFirstRun = mPrefs.getBoolean("firstrunkey", true);
+		modeOptimized = new ModeSettings(context, getModeFilename(Mode.Optimized));
+		modeEverything = new ModeSettings(context, getModeFilename(Mode.Everything));
+		modeOffline = new ModeSettings(context, getModeFilename(Mode.Offline));
 
-		// If this is first run, set the flag for next time
-		if (mIsFirstRun)
-			mPrefs.edit().putBoolean("firstrunkey", false).commit();
+		initializeIfNeeded();
+		setCurrentMode();
+
+		int fileVersion = mPrefs.getInt(KEY_SETTINGS_VERSION, 0);
+		if (fileVersion == 0) {
+			boolean uninstall = mPrefs.getBoolean("wipe_app", false);
+			setPanicAction(uninstall ? PanicAction.Uninstall : PanicAction.WipeData);
+		}
+		mPrefs.edit().putInt(KEY_SETTINGS_VERSION, CURRENT_SETTINGS_VERSION).apply();
 	}
 	
-	public void resetSettings() {		
-		// Reset all settings?
-
-		/*
-		boolean torRequiredDefault = context.getResources().getBoolean(R.bool.require_tor_default);
-		mPrefs.edit().putBoolean(KEY_REQUIRE_TOR, torRequiredDefault).commit();
-
-		mPrefs.edit().putInt(KEY_PASSPHRASE_TIMEOUT, 1440).commit();
-		*/
-		
-		mPrefs.edit().putBoolean("firstrunkey", true).commit();
+	@SuppressLint("ApplySharedPref")
+	public void resetSettings() {
+		mPrefs.edit().clear().commit();
+		initializeIfNeeded();
 	}
-	
+
+	private void initializeIfNeeded() {
+		if (!mPrefs.getBoolean("settings::initialized", false)) {
+
+			// Set defaults
+			mPrefs.edit()
+					.putString(context.getString(R.string.pref_key_mode), context.getString(R.string.pref_default_mode))
+					.putString(context.getString(R.string.pref_key_security_proxy), context.getString(R.string.pref_default_security_proxy))
+					.putString(context.getString(R.string.pref_key_panic_action), context.getString(R.string.pref_default_panic_action))
+
+					.apply();
+
+			modeOptimized.mPrefs.edit()
+					.putString(ModeSettings.KEY_SYNC_FREQUENCY, context.getString(R.string.pref_default_optimized_sync_frequency))
+					.putStringSet(ModeSettings.KEY_SYNC_OVER_WIFI, new HashSet<>(Arrays.asList(context.getResources().getStringArray(R.array.pref_default_optimized_sync_over_wifi))))
+					.putStringSet(ModeSettings.KEY_SYNC_OVER_DATA, new HashSet<>(Arrays.asList(context.getResources().getStringArray(R.array.pref_default_optimized_sync_over_data))))
+					.putBoolean(ModeSettings.KEY_SYNC_MEDIA_RICH, context.getResources().getBoolean(R.bool.pref_default_optimized_media_rich))
+					.putString(ModeSettings.KEY_ARTICLE_EXPIRATION, context.getString(R.string.pref_default_optimized_article_expiration))
+					.putBoolean(ModeSettings.KEY_POWERSAVE_ENABLED, context.getResources().getBoolean(R.bool.pref_default_optimized_save_power_enabled))
+					.putInt(ModeSettings.KEY_POWERSAVE_PERCENTAGE, context.getResources().getInteger(R.integer.pref_default_optimized_save_power_percentage))
+					.apply();
+			modeEverything.mPrefs.edit()
+					.putString(ModeSettings.KEY_SYNC_FREQUENCY, context.getString(R.string.pref_default_everything_sync_frequency))
+					.putStringSet(ModeSettings.KEY_SYNC_OVER_WIFI, new HashSet<>(Arrays.asList(context.getResources().getStringArray(R.array.pref_default_everything_sync_over_wifi))))
+					.putStringSet(ModeSettings.KEY_SYNC_OVER_DATA, new HashSet<>(Arrays.asList(context.getResources().getStringArray(R.array.pref_default_everything_sync_over_data))))
+					.putBoolean(ModeSettings.KEY_SYNC_MEDIA_RICH, context.getResources().getBoolean(R.bool.pref_default_everything_media_rich))
+					.putString(ModeSettings.KEY_ARTICLE_EXPIRATION, context.getString(R.string.pref_default_everything_article_expiration))
+					.putBoolean(ModeSettings.KEY_POWERSAVE_ENABLED, context.getResources().getBoolean(R.bool.pref_default_everything_save_power_enabled))
+					.putInt(ModeSettings.KEY_POWERSAVE_PERCENTAGE, context.getResources().getInteger(R.integer.pref_default_everything_save_power_percentage))
+					.apply();
+
+			mPrefs.edit()
+					.putInt(KEY_SETTINGS_VERSION, CURRENT_SETTINGS_VERSION)
+					.putBoolean("settings::initialized", true).apply();
+		}
+	}
+
 	public void registerChangeListener(SharedPreferences.OnSharedPreferenceChangeListener listener)
 	{
 		mPrefs.registerOnSharedPreferenceChangeListener(listener);
@@ -84,39 +142,59 @@ public class Settings
 		mPrefs.unregisterOnSharedPreferenceChangeListener(listener);
 	}
 
-	
-	/**
-	 * @return returns true if this is the first time we start the app
-	 * 
-	 */
-	public boolean isFirstRun()
+	public enum Mode
 	{
-		return mIsFirstRun;
-	}
-
-	public void setFirstRun(boolean value) {
-		mPrefs.edit().putBoolean("firstrunkey", value).commit();
-	}
-	
-	/**
-	 * @return Gets whether or not a TOR connection is required
-	 * 
-	 */
-	public boolean requireProxy()
-	{
-		boolean proxyRequiredDefault = context.getResources().getBoolean(R.bool.require_proxy_default);
-		return mPrefs.getBoolean(KEY_REQUIRE_PROXY, proxyRequiredDefault);
+		Optimized, Everything, Offline
 	}
 
 	/**
-	 * @return Sets whether a TOR connection is required
-	 * 
+	 * @return Gets required current mode
+	 *
 	 */
-	public void setRequireProxy(boolean require)
+	public Mode mode()
 	{
-		mPrefs.edit().putBoolean(KEY_REQUIRE_PROXY, require).commit();
+		String defaultValue = context.getResources().getString(R.string.pref_default_mode);
+		if (TextUtils.isEmpty(defaultValue))
+			defaultValue = Mode.Optimized.name();
+		return Enum.valueOf(Mode.class, mPrefs.getString(KEY_MODE, defaultValue));
 	}
-	
+
+	/**
+	 * @return Sets mode
+	 *
+	 */
+	public void setMode(Mode mode)
+	{
+		mPrefs.edit().putString(KEY_MODE, mode.name()).apply();
+		setCurrentMode();
+	}
+
+	public String getModeFilename(Mode mode) {
+		switch (mode) {
+			case Optimized:
+				return "optimized";
+			case Everything:
+				return "everything";
+			default:
+				return "offline";
+		}
+	}
+
+	public ModeSettings getCurrentMode() {
+		return currentMode;
+	}
+
+	private void setCurrentMode() {
+		switch (mode()) {
+			case Optimized:
+				currentMode = modeOptimized;
+			case Everything:
+				currentMode = modeEverything;
+			default:
+				currentMode = modeOffline;
+		}
+	}
+
 	public enum ProxyType
 	{
 		None, Tor, Psiphon
@@ -128,7 +206,7 @@ public class Settings
 	 */
 	public ProxyType proxyType()
 	{
-		String defaultProxyType = context.getResources().getString(R.string.default_proxy_type);
+		String defaultProxyType = context.getResources().getString(R.string.pref_default_security_proxy);
 		if (TextUtils.isEmpty(defaultProxyType))
 			defaultProxyType = ProxyType.None.name();
 		return Enum.valueOf(ProxyType.class, mPrefs.getString(KEY_PROXY_TYPE, defaultProxyType));
@@ -140,12 +218,10 @@ public class Settings
 	 */
 	public void setProxyType(ProxyType proxyType)
 	{
-		mPrefs.edit().putString(KEY_PROXY_TYPE, proxyType.name()).commit();
+		mPrefs.edit().putString(KEY_PROXY_TYPE, proxyType.name()).apply();
 	}
 	
-	
-	
-	
+
 	/**
 	 * @return Gets the timeout before lock screen is shown
 	 * 
@@ -186,248 +262,56 @@ public class Settings
 		mPrefs.edit().putString("launch_passphrase", passphrase).commit();
 	}
 
-	/**
-	 * If we have made content text larger or smaller store the adjustment here
-	 * (we don't store the absolute size here since we might change the default
-	 * font and therefore need to change the default font size as well).
-	 * 
-	 * @return adjustment we have made to default font size (in sp units)
-	 * 
-	 */
-	public int getContentFontSizeAdjustment()
+	public enum PanicAction
 	{
-		return mPrefs.getInt(KEY_CONTENT_FONT_SIZE_ADJUSTMENT, 0);
+		WipeData, Uninstall
 	}
 
-	/**
-	 * Set the adjustment for default font size in sp units (positive means
-	 * larger, negative means smaller)
-	 * 
-	 */
-	public void setContentFontSizeAdjustment(int adjustment)
+	public PanicAction panicAction()
 	{
-		mPrefs.edit().putInt(KEY_CONTENT_FONT_SIZE_ADJUSTMENT, adjustment).commit();
+		return Enum.valueOf(PanicAction.class, mPrefs.getString(KEY_PANIC_ACTION,
+				context.getResources().getString(R.string.pref_default_panic_action)));
 	}
 
-	/**
-	 * @return Gets whether we should wipe the entire app (as opposed to only
-	 *         the user data)
-	 * 
-	 */
-	public boolean wipeApp()
+	public void setPanicAction(PanicAction panicAction)
 	{
-		boolean wipeAppDefault = context.getResources().getBoolean(R.bool.wipe_app_default);
-		return mPrefs.getBoolean(KEY_WIPE_APP, wipeAppDefault);
+		mPrefs.edit().putString(KEY_PANIC_ACTION, panicAction.name()).apply();
 	}
 
-	/**
-	 * @return Sets whether we should wipe the entire app (as opposed to only
-	 *         the user data)
-	 * 
-	 */
-	public void setWipeApp(boolean wipeApp)
-	{
-		mPrefs.edit().putBoolean(KEY_WIPE_APP, wipeApp).commit();
-	}
-
-	public enum ArticleExpiration
-	{
-		Never, OneDay, OneWeek, OneMonth
-	}
-
-	/**
-	 * @return Gets when articles are expired
-	 * 
-	 */
-	public ArticleExpiration articleExpiration()
-	{
-		return Enum.valueOf(ArticleExpiration.class, mPrefs.getString(KEY_ARTICLE_EXPIRATION, context.getResources().getString(R.string.article_expiration_default)));
-	}
-	
-	public long articleExpirationMillis() {
-		if (articleExpiration() == ArticleExpiration.OneDay) {
-			return   86400000L;
-		} else if (articleExpiration() == ArticleExpiration.OneWeek) {
-			return  604800000L;
-		} else if (articleExpiration() == ArticleExpiration.OneMonth) {
-			return 2592000000L;
-		} else {
-			return -1L;
-		}
-	}
-
-	/**
-	 * @return Sets when articles are expired
-	 * 
-	 */
-	public void setArticleExpiration(ArticleExpiration articleExpiration)
-	{
-		mPrefs.edit().putString(KEY_ARTICLE_EXPIRATION, articleExpiration.name()).commit();
-	}
-
-	public enum SyncFrequency
-	{
-		Manual, WhenRunning, InBackground
-	}
-
-	/**
-	 * @return Gets when to sync feeds
-	 * 
-	 */
-	public SyncFrequency syncFrequency()
-	{
-		// return Enum.valueOf(SyncFrequency.class,
-		// mPrefs.getString(KEY_SYNC_FREQUENCY, SyncFrequency.Manual.name()));
-		return Enum.valueOf(SyncFrequency.class, mPrefs.getString(KEY_SYNC_FREQUENCY, context.getResources().getString(R.string.sync_frequency_default)));
-	}
-
-	/**
-	 * @return Sets when to sync feeds. Can be manual, when app is running or
-	 *         when in background.
-	 * 
-	 */
-	public void setSyncFrequency(SyncFrequency syncFreqency)
-	{
-		mPrefs.edit().putString(KEY_SYNC_FREQUENCY, syncFreqency.name()).commit();
-	}
-
-	public enum SyncMode
-	{
-		BitWise, LetItFlow
-	}
-
-	/**
-	 * @return Gets whether or not to download media automatically or only on
-	 *         demand
-	 * 
-	 */
-	public SyncMode syncMode()
-	{
-		// return Enum.valueOf(SyncMode.class, mPrefs.getString(KEY_SYNC_MODE,
-		// SyncMode.LetItFlow.name()));
-		String syncModeDefault = context.getResources().getString(R.string.sync_mode_default);
-		return Enum.valueOf(SyncMode.class, mPrefs.getString(KEY_SYNC_MODE, syncModeDefault));
-	}
-
-	/**
-	 * @return Sets whether or not to download media automatically or only on
-	 *         demand
-	 * 
-	 */
-	public void setSyncMode(SyncMode syncMode)
-	{
-		mPrefs.edit().putString(KEY_SYNC_MODE, syncMode.name()).commit();
-	}
-
-	public enum SyncNetwork
-	{
-		WifiAndMobile, WifiOnly
-	}
-
-	/**
-	 * @return Gets over which networks that sync is available
-	 * 
-	 */
-	public SyncNetwork syncNetwork()
-	{
-		String syncNetworkDefault = context.getResources().getString(R.string.sync_network_default);
-		return Enum.valueOf(SyncNetwork.class, mPrefs.getString(KEY_SYNC_NETWORK, syncNetworkDefault));
-	}
-
-	/**
-	 * @return Sets over which networks that sync is available
-	 * 
-	 */
-	public void setSyncNetwork(SyncNetwork syncNetwork)
-	{
-		mPrefs.edit().putString(KEY_SYNC_NETWORK, syncNetwork.name()).commit();
-	}
-
-	public enum ReaderSwipeDirection
-	{
-		Rtl, Ltr, Automatic
-	}
-
-	/**
-	 * @return Gets how swipes are handled in full screen story view
-	 * 
-	 */
-	public ReaderSwipeDirection readerSwipeDirection()
-	{
-		return Enum.valueOf(ReaderSwipeDirection.class, mPrefs.getString(KEY_READER_SWIPE_DIRECTION, ReaderSwipeDirection.Automatic.name()));
-	}
-
-	/**
-	 * @return Sets how swipes are handled in full screen story view
-	 * 
-	 */
-	public void setReaderSwipeDirection(ReaderSwipeDirection readerSwipeDirection)
-	{
-		mPrefs.edit().putString(KEY_READER_SWIPE_DIRECTION, readerSwipeDirection.name()).commit();
-	}
-
-	public enum UiLanguage
-	{
-		English, Chinese, Japanese, Norwegian, Spanish, Spanish_US, Tibetan, Turkish, Russian, Ukrainian, Farsi, Arabic,
-		German, French
-		//Italian, Swedish, Dutch, Korean, Brazilian Portuguese
-		// I added Arabic, perhaps prematurely
-	}
 
 	/**
 	 * @return gets the app ui language
 	 * 
 	 */
-	public UiLanguage uiLanguage()
+	public String uiLanguage()
 	{
 		String ret = mPrefs.getString(KEY_UI_LANGUAGE, null);
 		if (ret != null)
 		{
-			return Enum.valueOf(UiLanguage.class, ret);
+			return ret;
 		}
-		
-		// Is default system language arabic?
+
 		String defaultLanguage = Locale.getDefault().getLanguage();
-		
-		if (defaultLanguage.equals("ar"))
-			return UiLanguage.Arabic;
-		else if (defaultLanguage.equals("fa"))
-			return UiLanguage.Farsi;
-		else if (defaultLanguage.equals("bo"))
-			return UiLanguage.Tibetan;
-		else if (defaultLanguage.equals("es")) {
+		List<String> langs = Lists.newArrayList("ar", "fa", "bo", "ja", "nb", "tr", "zh", "uk", "ru", "de", "fr");
+		if (langs.contains(defaultLanguage)) {
+			return defaultLanguage;
+		} else if (defaultLanguage.equals("es")) {
 			String country = Locale.getDefault().getCountry();
 			if (!TextUtils.isEmpty(country) && country.startsWith("US")) {
-				return UiLanguage.Spanish_US;
+				return "en_US";
 			}
-			return UiLanguage.Spanish;
+			return "es";
 		}
-		else if (defaultLanguage.equals("ja"))
-			return UiLanguage.Japanese;
-		else if (defaultLanguage.equals("nb"))
-			return UiLanguage.Norwegian;
-		else if (defaultLanguage.equals("tr"))
-			return UiLanguage.Turkish;
-		else if (defaultLanguage.equals("zh"))
-			return UiLanguage.Chinese;
-		else if (defaultLanguage.equals("uk"))
-			return UiLanguage.Ukrainian;
-		else if (defaultLanguage.equals("ru"))
-			return UiLanguage.Russian;
-		else if (defaultLanguage.equals("de"))
-			return UiLanguage.German;
-		else if (defaultLanguage.equals("fr"))
-			return UiLanguage.French;
-		return UiLanguage.English;
+		return "en";
 	}
 
 	/**
 	 * @return Sets the app ui language
 	 * 
 	 */
-	public void setUiLanguage(UiLanguage language)
+	public void setUiLanguage(String language)
 	{
-		mPrefs.edit().putString(KEY_UI_LANGUAGE, language.name()).commit();
+		mPrefs.edit().putString(KEY_UI_LANGUAGE, language).apply();
 	}
 
 	/**
@@ -610,7 +494,14 @@ public class Settings
 	public void setLocalOpmlLoaded() {
 		mPrefs.edit().putBoolean(KEY_LOCAL_OPML_LOADED, true).commit();
 	}
-	
-	
+
+	private Set<Enum> arrayResourceToEnumSet(Class enumClass, int idRes) {
+		Set<Enum> res = new HashSet<>();
+		String[] values = context.getResources().getStringArray(idRes);
+		for (String val : values) {
+			res.add(Enum.valueOf(enumClass, val));
+		}
+		return res;
+	}
 	
 }
