@@ -79,57 +79,60 @@ public class Settings
 		modeEverything = new ModeSettings(context, getModeFilename(Mode.Everything));
 		modeOffline = new ModeSettings(context, getModeFilename(Mode.Offline));
 
+		int fileVersion = mPrefs.getInt(KEY_SETTINGS_VERSION, 0);
 		initializeIfNeeded();
 		setCurrentMode();
 
-		int fileVersion = mPrefs.getInt(KEY_SETTINGS_VERSION, 0);
 		if (fileVersion == 0) {
 			boolean uninstall = mPrefs.getBoolean("wipe_app", false);
 			setPanicAction(uninstall ? PanicAction.Uninstall : PanicAction.WipeData);
 		}
-		mPrefs.edit().putInt(KEY_SETTINGS_VERSION, CURRENT_SETTINGS_VERSION).apply();
 	}
 	
 	@SuppressLint("ApplySharedPref")
 	public void resetSettings() {
 		mPrefs.edit().clear().commit();
+		modeOptimized.mPrefs.edit().clear().commit();
+		modeEverything.mPrefs.edit().clear().commit();
+		modeOffline.mPrefs.edit().clear().commit();
 		initializeIfNeeded();
 	}
 
 	private void initializeIfNeeded() {
-		if (!mPrefs.getBoolean("settings::initialized", false)) {
-
-			// Set defaults
-			mPrefs.edit()
-					.putString(context.getString(R.string.pref_key_mode), context.getString(R.string.pref_default_mode))
-					.putString(context.getString(R.string.pref_key_security_proxy), context.getString(R.string.pref_default_security_proxy))
-					.putString(context.getString(R.string.pref_key_panic_action), context.getString(R.string.pref_default_panic_action))
-
-					.apply();
-
-			modeOptimized.mPrefs.edit()
-					.putString(ModeSettings.KEY_SYNC_FREQUENCY, context.getString(R.string.pref_default_optimized_sync_frequency))
-					.putStringSet(ModeSettings.KEY_SYNC_OVER_WIFI, new HashSet<>(Arrays.asList(context.getResources().getStringArray(R.array.pref_default_optimized_sync_over_wifi))))
-					.putStringSet(ModeSettings.KEY_SYNC_OVER_DATA, new HashSet<>(Arrays.asList(context.getResources().getStringArray(R.array.pref_default_optimized_sync_over_data))))
-					.putBoolean(ModeSettings.KEY_SYNC_MEDIA_RICH, context.getResources().getBoolean(R.bool.pref_default_optimized_media_rich))
-					.putString(ModeSettings.KEY_ARTICLE_EXPIRATION, context.getString(R.string.pref_default_optimized_article_expiration))
-					.putBoolean(ModeSettings.KEY_POWERSAVE_ENABLED, context.getResources().getBoolean(R.bool.pref_default_optimized_save_power_enabled))
-					.putInt(ModeSettings.KEY_POWERSAVE_PERCENTAGE, context.getResources().getInteger(R.integer.pref_default_optimized_save_power_percentage))
-					.apply();
-			modeEverything.mPrefs.edit()
-					.putString(ModeSettings.KEY_SYNC_FREQUENCY, context.getString(R.string.pref_default_everything_sync_frequency))
-					.putStringSet(ModeSettings.KEY_SYNC_OVER_WIFI, new HashSet<>(Arrays.asList(context.getResources().getStringArray(R.array.pref_default_everything_sync_over_wifi))))
-					.putStringSet(ModeSettings.KEY_SYNC_OVER_DATA, new HashSet<>(Arrays.asList(context.getResources().getStringArray(R.array.pref_default_everything_sync_over_data))))
-					.putBoolean(ModeSettings.KEY_SYNC_MEDIA_RICH, context.getResources().getBoolean(R.bool.pref_default_everything_media_rich))
-					.putString(ModeSettings.KEY_ARTICLE_EXPIRATION, context.getString(R.string.pref_default_everything_article_expiration))
-					.putBoolean(ModeSettings.KEY_POWERSAVE_ENABLED, context.getResources().getBoolean(R.bool.pref_default_everything_save_power_enabled))
-					.putInt(ModeSettings.KEY_POWERSAVE_PERCENTAGE, context.getResources().getInteger(R.integer.pref_default_everything_save_power_percentage))
-					.apply();
-
-			mPrefs.edit()
-					.putInt(KEY_SETTINGS_VERSION, CURRENT_SETTINGS_VERSION)
-					.putBoolean("settings::initialized", true).apply();
+		if (!mPrefs.contains(KEY_SETTINGS_VERSION)) {
+			initialize();
 		}
+	}
+
+	private void initialize() {
+		// Set defaults
+		mPrefs.edit()
+				.putString(KEY_MODE, context.getString(R.string.pref_default_mode))
+				.putString(KEY_PROXY_TYPE, context.getString(R.string.pref_default_security_proxy))
+				.putString(KEY_PANIC_ACTION, context.getString(R.string.pref_default_panic_action))
+
+				.apply();
+
+		modeOptimized.mPrefs.edit()
+				.putString(ModeSettings.KEY_SYNC_FREQUENCY, context.getString(R.string.pref_default_optimized_sync_frequency))
+				.putStringSet(ModeSettings.KEY_SYNC_OVER_WIFI, new HashSet<>(Arrays.asList(context.getResources().getStringArray(R.array.pref_default_optimized_sync_over_wifi))))
+				.putStringSet(ModeSettings.KEY_SYNC_OVER_DATA, new HashSet<>(Arrays.asList(context.getResources().getStringArray(R.array.pref_default_optimized_sync_over_data))))
+				.putBoolean(ModeSettings.KEY_SYNC_MEDIA_RICH, context.getResources().getBoolean(R.bool.pref_default_optimized_media_rich))
+				.putString(ModeSettings.KEY_ARTICLE_EXPIRATION, context.getString(R.string.pref_default_optimized_article_expiration))
+				.putBoolean(ModeSettings.KEY_POWERSAVE_ENABLED, context.getResources().getBoolean(R.bool.pref_default_optimized_save_power_enabled))
+				.putInt(ModeSettings.KEY_POWERSAVE_PERCENTAGE, context.getResources().getInteger(R.integer.pref_default_optimized_save_power_percentage))
+				.apply();
+		modeEverything.mPrefs.edit()
+				.putString(ModeSettings.KEY_SYNC_FREQUENCY, context.getString(R.string.pref_default_everything_sync_frequency))
+				.putStringSet(ModeSettings.KEY_SYNC_OVER_WIFI, new HashSet<>(Arrays.asList(context.getResources().getStringArray(R.array.pref_default_everything_sync_over_wifi))))
+				.putStringSet(ModeSettings.KEY_SYNC_OVER_DATA, new HashSet<>(Arrays.asList(context.getResources().getStringArray(R.array.pref_default_everything_sync_over_data))))
+				.putBoolean(ModeSettings.KEY_SYNC_MEDIA_RICH, context.getResources().getBoolean(R.bool.pref_default_everything_media_rich))
+				.putString(ModeSettings.KEY_ARTICLE_EXPIRATION, context.getString(R.string.pref_default_everything_article_expiration))
+				.putBoolean(ModeSettings.KEY_POWERSAVE_ENABLED, context.getResources().getBoolean(R.bool.pref_default_everything_save_power_enabled))
+				.putInt(ModeSettings.KEY_POWERSAVE_PERCENTAGE, context.getResources().getInteger(R.integer.pref_default_everything_save_power_percentage))
+				.apply();
+		mPrefs.edit()
+				.putInt(KEY_SETTINGS_VERSION, CURRENT_SETTINGS_VERSION).apply();
 	}
 
 	public void registerChangeListener(SharedPreferences.OnSharedPreferenceChangeListener listener)
