@@ -67,6 +67,7 @@ import android.graphics.drawable.BitmapDrawable;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
+import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Environment;
 import android.os.Handler;
@@ -221,6 +222,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	PsiphonHelper psiphonHelper;
 	
 	Item talkItem = null;
+	float currentBatteryLevel = 1.0f;
 
 	private SocialReader(Context _context) {
 		
@@ -301,7 +303,19 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 			        }
 			    }, new IntentFilter(Constants.INTENT_NEW_SECRETS));
 
+		BroadcastReceiver batteryStatusReceiver = new BroadcastReceiver(){
 
+			@Override
+			public void onReceive(Context context, Intent intent) {
+				if (LOGGING)
+					Log.v(LOGTAG,"onReceive " + intent.getAction());
+				int level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+				int scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+				currentBatteryLevel = level / (float)scale;
+				onBatteryLevelChanged();
+			}
+		};
+		applicationContext.registerReceiver(psiphonHelperReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
 	}
 		
     private static SocialReader socialReader = null;
@@ -1388,7 +1402,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 								if (LOGGING)
 									Log.v(LOGTAG, "Adding to sync " + m.getUrl());
 								
-								syncService.addMediaContentSyncTask(m, false, null);
+								syncService.addMediaContentSyncTask(item, m, false, null);
 							}
 						}
 					}
@@ -2112,7 +2126,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	{
 		if (syncSettingsForCurrentNetwork().contains(ModeSettings.Sync.Media)) {
 			for (MediaContent contentItem : item.getMediaContent()) {
-				syncService.addMediaContentSyncTask(contentItem, false, null);
+				syncService.addMediaContentSyncTask(item, contentItem, false, null);
 			}
 		}
 	}
@@ -2518,21 +2532,21 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	}
 	*/
 
-	public boolean isMediaContentLoaded(MediaContent mc)
+	public boolean isMediaContentLoaded(Item item, MediaContent mc)
 	{
-		return loadMediaContent(mc, null, false, false);
+		return loadMediaContent(item, mc, null, false, false);
 	}
 	
-	public boolean loadMediaContent(MediaContent mc, SyncTaskMediaFetcher.SyncTaskMediaFetcherCallback mdc) {
-		return loadMediaContent(mc, mdc, false);
+	public boolean loadMediaContent(Item item, MediaContent mc, SyncTaskMediaFetcher.SyncTaskMediaFetcherCallback mdc) {
+		return loadMediaContent(item, mc, mdc, false);
 	}
 
-	public boolean loadMediaContent(MediaContent mc, SyncTaskMediaFetcher.SyncTaskMediaFetcherCallback mdc, boolean forceBitwiseDownload)
+	public boolean loadMediaContent(Item item, MediaContent mc, SyncTaskMediaFetcher.SyncTaskMediaFetcherCallback mdc, boolean forceBitwiseDownload)
 	{
-		return loadMediaContent(mc, mdc, true, forceBitwiseDownload);
+		return loadMediaContent(item, mc, mdc, true, forceBitwiseDownload);
 	}
 	
-	public boolean loadMediaContent(MediaContent mc, final SyncTaskMediaFetcher.SyncTaskMediaFetcherCallback mdc, boolean download, boolean forceBitwiseDownload) {
+	public boolean loadMediaContent(Item item, MediaContent mc, final SyncTaskMediaFetcher.SyncTaskMediaFetcherCallback mdc, boolean download, boolean forceBitwiseDownload) {
 		switch (mc.getMediaContentType()) {
 			case IMAGE:
 				forceBitwiseDownload = forceBitwiseDownload || (syncSettingsForCurrentNetwork().contains(ModeSettings.Sync.Media));
@@ -2550,7 +2564,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 				} else if (download && forceBitwiseDownload && isOnline() == ONLINE) {
 					if (LOGGING)
 						Log.v(LOGTAG, "File doesn't exist, downloading");
-					syncService.addMediaContentSyncTask(mc, true, mdc);
+					syncService.addMediaContentSyncTask(item, mc, true, mdc);
 					return true;
 				}
 				break;
@@ -2977,7 +2991,25 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 				checkTorStatus();
 			else if (settings.proxyType() == ProxyType.Psiphon)
 				checkPsiphonStatus();
+		} else if (Settings.KEY_MODE.equals(key) || sharedPreferences == settings.getCurrentMode().mPrefs) {
+			sync();
 		}
+	}
+
+	private void sync() {
+		if (syncService != null) {
+			syncService.cancelAll();
+
+			boolean offlineMode = (settings.mode() == Settings.Mode.Offline);
+			boolean batteryTooLow = (settings.getCurrentMode().powerSaveEnabled() && settings.getCurrentMode().powersavePercentage() >= (currentBatteryLevel * 100f));
+			if (isOnline() != ONLINE && !offlineMode && !batteryTooLow) {
+
+			}
+		}
+	}
+
+	private void onBatteryLevelChanged() {
+		sync();
 	}
 
 	public void deleteItem(Item story)

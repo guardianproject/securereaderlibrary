@@ -21,7 +21,7 @@ public class SyncTaskFeedIconFetcher extends SyncTask<SyncTaskFeedIconFetcher>
 
 	public Feed feed;
 
-	public SyncTaskFeedIconFetcher(Context context, int priority, Feed feed)
+	public SyncTaskFeedIconFetcher(Context context, long priority, Feed feed)
 	{
 		super(context, priority);
 		this.feed = feed;

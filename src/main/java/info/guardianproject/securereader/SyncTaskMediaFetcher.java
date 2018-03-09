@@ -25,7 +25,7 @@ public class SyncTaskMediaFetcher extends SyncTask<SyncTaskMediaFetcher> {
 	public final MediaContent mediaContent;
     public File targetFile;
 
-    public SyncTaskMediaFetcher(Context context, int priority, MediaContent mediaContent)
+    public SyncTaskMediaFetcher(Context context, long priority, MediaContent mediaContent)
 	{
 		super(context, priority);
 		this.mediaContent = mediaContent;

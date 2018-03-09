@@ -31,7 +31,7 @@ public class SyncTaskCommentsFetcher extends SyncTask<SyncTaskCommentsFetcher>
 		void commentsFeedFetchError(Item _item);
 	}
 
-	public SyncTaskCommentsFetcher(Context context, int priority, Item item)
+	public SyncTaskCommentsFetcher(Context context, long priority, Item item)
 	{
 		super(context, priority);
 		this.item = item;

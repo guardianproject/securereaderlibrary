@@ -191,10 +191,13 @@ public class Settings
 		switch (mode()) {
 			case Optimized:
 				currentMode = modeOptimized;
+				break;
 			case Everything:
 				currentMode = modeEverything;
+				break;
 			default:
 				currentMode = modeOffline;
+				break;
 		}
 	}
 

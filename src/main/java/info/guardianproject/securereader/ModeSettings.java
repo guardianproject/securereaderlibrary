@@ -175,7 +175,27 @@ public class ModeSettings
 	 */
 	public void setArticleExpiration(ArticleExpiration articleExpiration)
 	{
-		mPrefs.edit().putString(KEY_ARTICLE_EXPIRATION, articleExpiration.name()).commit();
+		mPrefs.edit().putString(KEY_ARTICLE_EXPIRATION, articleExpiration.name()).apply();
+	}
+
+	public boolean powerSaveEnabled()
+	{
+		return mPrefs.getBoolean(KEY_POWERSAVE_ENABLED, true);
+	}
+
+	public void setPowerSaveEnabled(boolean enabled)
+	{
+		mPrefs.edit().putBoolean(KEY_POWERSAVE_ENABLED, enabled).apply();
+	}
+
+	public int powersavePercentage()
+	{
+		return mPrefs.getInt(KEY_POWERSAVE_PERCENTAGE, 30);
+	}
+
+	public void setPowersavePercentage(int percentage)
+	{
+		mPrefs.edit().putInt(KEY_POWERSAVE_PERCENTAGE, percentage).apply();
 	}
 
 /*	public enum SyncMode

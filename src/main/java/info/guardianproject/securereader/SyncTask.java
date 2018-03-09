@@ -32,13 +32,13 @@ abstract public class SyncTask<T> implements Callable<T> {
     public enum SyncTaskStatus {
         ERROR, CREATED, QUEUED, STARTED, FINISHED, CANCELLED
     };
-    public int priority;
+    public long priority;
     public SyncTaskStatus status = SyncTaskStatus.CREATED;
     public long startTime = -1;
 
     private final Context context;
 
-    public SyncTask(Context context, int priority) {
+    public SyncTask(Context context, long priority) {
         this.context = context;
         this.priority = priority;
     }

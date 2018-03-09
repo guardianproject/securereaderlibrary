@@ -21,6 +21,7 @@ import com.tinymission.rss.Feed;
 import com.tinymission.rss.Item;
 import com.tinymission.rss.MediaContent;
 
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
@@ -46,14 +47,116 @@ public class SyncService {
 	public static final String EXTRA_SYNCSERVICE_MEDIA = "syncservice_extras_media";
 	public static final String EXTRA_SYNCSERVICE_ITEM = "syncservice_extras_item";
 
+	private enum DownloadType {
+		Feed,
+		FeedIcon,
+		ItemComments,
+		ItemText,
+		ItemMedia
+	}
 
-	//private static final String PRIORITY_SCHEME = ""
+	private enum PriorityComponent {
+		FEED_NUMBER(10),
+		ITEM_NUMBER(10),
+		DATE_RANGE(4),
+		TYPE(4),
+		USER_INITIATED(1);
 
-	private static final int TASK_FEED_PRIORITY = 5;
-	private static final int TASK_FEED_ICON_PRIORITY = 4;
-	private static final int TASK_MEDIA_PRIORITY = 3;
-	private static final int TASK_MEDIA_UI_PRIORITY = 10;
-	private static final int TASK_COMMENTS_PRIORITY = 5;
+		public final int bits;
+		PriorityComponent(int bits) {
+			this.bits = bits;
+		}
+
+	}
+	private static PriorityComponent[] priorityScheme = new PriorityComponent[] { PriorityComponent.USER_INITIATED, PriorityComponent.DATE_RANGE, PriorityComponent.TYPE, PriorityComponent.ITEM_NUMBER, PriorityComponent.FEED_NUMBER };
+	private static DownloadType[] prioritySchemeTypes = new DownloadType[] { DownloadType.Feed, DownloadType.FeedIcon, DownloadType.ItemText, DownloadType.ItemMedia, DownloadType.ItemComments };
+
+	long getPriorityForItem(int feedNumber, int itemNumber, Date itemDate, DownloadType type, boolean userInitiated) {
+
+		long priority = 0;
+
+		for (PriorityComponent component : priorityScheme) {
+			int bitlength = component.bits;
+			priority = priority << bitlength;
+			long mask = (1 << bitlength) - 1;
+			switch (component) {
+				case FEED_NUMBER:
+					priority = priority | (mask & feedNumber);
+					break;
+				case ITEM_NUMBER:
+					priority = priority | (mask & itemNumber);
+					break;
+				case DATE_RANGE:
+					if (itemDate != null) {
+						long now = System.currentTimeMillis();
+						long diff = itemDate.getTime() - now;
+						if (diff < 1000 * 60 * 60 * 4) {
+							// 0
+						} else if (diff < 1000 * 60 * 60 * 8) {
+							priority = priority | (mask & 1);
+						} else if (diff < 1000 * 60 * 60 * 24) {
+							priority = priority | (mask & 2);
+						} else {
+							priority = priority | (mask & 3);
+						}
+					}
+					break;
+				case TYPE: {
+					int value = Arrays.asList(prioritySchemeTypes).indexOf(type);
+					if (value == -1) {
+						value = 0;
+					}
+					priority = priority | (mask & value);
+					}
+					break;
+				case USER_INITIATED:
+					priority = priority | (mask & (userInitiated ? 0 : 1)); // Negate the flag, user initiated has higher prio (= lower number)
+					break;
+				default:break;
+			}
+		}
+
+		return priority;
+	}
+
+	private long getPriorityForFeed(Feed feed, boolean userInitiated) {
+		return getPriorityForItem(getFeedIndexNumber(feed), 0, null, DownloadType.Feed, userInitiated);
+	}
+
+	private long getPriorityForItem(Item item, DownloadType type, boolean userInitiated) {
+		long feedId = item.getFeedId();
+		Feed feed = socialReader.getFeedById(feedId);
+		return getPriorityForItem(getFeedIndexNumber(feed), getItemIndexNumber(feed, item), item.getPubDate(), type, userInitiated);
+	}
+
+	private long getPriorityForFeed(Feed feed, DownloadType type, boolean userInitiated) {
+		return getPriorityForItem(getFeedIndexNumber(feed), 0, null, type, userInitiated);
+	}
+
+	private int getFeedIndexNumber(Feed feed) {
+		if (feed == null) {
+			return 0;
+		}
+		List<Feed> feeds = socialReader.getSubscribedFeedsList();
+		if (feeds != null) {
+			for (int i = 0; i < feeds.size(); i++) {
+				if (feeds.get(i).getDatabaseId() == feed.getDatabaseId()) {
+					return i;
+				}
+			}
+		}
+		return 0;
+	}
+
+	private int getItemIndexNumber(Feed feed, Item item) {
+		return 0; //TODO
+	}
+
+	//private static final int TASK_FEED_PRIORITY = 5;
+	//private static final int TASK_FEED_ICON_PRIORITY = 4;
+	//private static final int TASK_MEDIA_PRIORITY = 3;
+	//private static final int TASK_MEDIA_UI_PRIORITY = 10;
+	//private static final int TASK_COMMENTS_PRIORITY = 5;
 
 	public static final String LOGTAG = "SyncService";
 	public static final boolean LOGGING = false;
@@ -144,13 +247,14 @@ public class SyncService {
 		return null;
 	}
 
-	public PrioritizedListenableFutureTask<SyncTaskFeedIconFetcher> addFeedIconSyncTask(Feed feed) {
-		synchronized (syncServiceExecutorService) {
-			PrioritizedListenableFutureTask<SyncTaskFeedIconFetcher> task = getExistingTask(SyncTaskFeedIconFetcher.class, feed.getFeedURL());
-			if (task != null) {
-				return task; // Already in queue
-			}
-			task = (PrioritizedListenableFutureTask<SyncTaskFeedIconFetcher>) syncServiceExecutorService.submit(new SyncTaskFeedIconFetcher(context, TASK_FEED_ICON_PRIORITY, feed));
+	public PrioritizedListenableFutureTask<SyncTaskFeedIconFetcher> addFeedIconSyncTask(Feed feed, boolean userInitiated) {
+				synchronized (syncServiceExecutorService) {
+					PrioritizedListenableFutureTask<SyncTaskFeedIconFetcher> task = getExistingTask(SyncTaskFeedIconFetcher.class, feed.getFeedURL());
+					if (task != null) {
+						return task; // Already in queue
+					}
+					long priority = getPriorityForFeed(feed, DownloadType.FeedIcon, userInitiated);
+			task = (PrioritizedListenableFutureTask<SyncTaskFeedIconFetcher>) syncServiceExecutorService.submit(new SyncTaskFeedIconFetcher(context, priority, feed));
 			task.addListener(new PrioritizedTaskListener<SyncTaskFeedIconFetcher>(task) {
 
 				private void sendBroadcast(Feed feed, SyncStatus status) {
@@ -176,7 +280,7 @@ public class SyncService {
 		}
 	}
 
-	public PrioritizedListenableFutureTask<SyncTaskFeedFetcher> addFeedSyncTask(Feed feed, boolean userInitiated, final SyncTaskFeedFetcher.SyncTaskFeedFetcherCallback callback) {
+	public PrioritizedListenableFutureTask<SyncTaskFeedFetcher> addFeedSyncTask(Feed feed, final boolean userInitiated, final SyncTaskFeedFetcher.SyncTaskFeedFetcherCallback callback) {
 		synchronized (syncServiceExecutorService) {
 			PrioritizedListenableFutureTask<SyncTaskFeedFetcher> task = getExistingTask(SyncTaskFeedFetcher.class, feed.getFeedURL());
 			if (task != null) {
@@ -188,7 +292,8 @@ public class SyncService {
 				return null; // Wait a bit longer...
 			}
 
-			final SyncTaskFeedFetcher feedSyncTask = new SyncTaskFeedFetcher(context, TASK_FEED_PRIORITY, feed);
+			long priority = getPriorityForFeed(feed, userInitiated);
+			final SyncTaskFeedFetcher feedSyncTask = new SyncTaskFeedFetcher(context, priority, feed);
 			task = (PrioritizedListenableFutureTask<SyncTaskFeedFetcher>) syncServiceExecutorService.submit(feedSyncTask);
 
 			// Add a listener for the future
@@ -206,7 +311,7 @@ public class SyncService {
 					super.onSuccess(task);
 					// Tell our listeners we are done
 					sendBroadcast(task.feed, task.feed.getStatus());
-					addFeedIconSyncTask(task.feed);
+					addFeedIconSyncTask(task.feed, userInitiated);
 					SocialReader.getInstance(context).backgroundDownloadFeedItemMedia(task.feed);
 
 					// Call callback on main thread
@@ -307,7 +412,8 @@ public class SyncService {
 				return null; // Wait a bit longer...
 			}
 
-			final SyncTaskCommentsFetcher commentsSyncTask = new SyncTaskCommentsFetcher(context, TASK_COMMENTS_PRIORITY, item);
+			long priority = getPriorityForItem(item, DownloadType.ItemComments, userInitiated);
+			final SyncTaskCommentsFetcher commentsSyncTask = new SyncTaskCommentsFetcher(context, priority, item);
 			task = (PrioritizedListenableFutureTask<SyncTaskCommentsFetcher>) syncServiceExecutorService.submit(commentsSyncTask);
 
 			// Add a listener for the future
@@ -353,14 +459,15 @@ public class SyncService {
 		}
 	}
 
-	public PrioritizedListenableFutureTask<SyncTaskMediaFetcher> addMediaContentSyncTask(MediaContent mediaContent, boolean userInitiated, final SyncTaskMediaFetcher.SyncTaskMediaFetcherCallback callback) {
+	public PrioritizedListenableFutureTask<SyncTaskMediaFetcher> addMediaContentSyncTask(Item item, MediaContent mediaContent, boolean userInitiated, final SyncTaskMediaFetcher.SyncTaskMediaFetcherCallback callback) {
 		synchronized (syncServiceExecutorService) {
+			long priority = getPriorityForItem(item, DownloadType.ItemMedia, userInitiated);
 			PrioritizedListenableFutureTask<SyncTaskMediaFetcher> task = getExistingTask(SyncTaskMediaFetcher.class, mediaContent.getUrl());
 			if (task != null) {
 				// Need to change priority?
-				if (userInitiated && task.getPriority() != TASK_MEDIA_UI_PRIORITY) {
+				if (task.getPriority() != priority) {
 					syncServiceExecutorQueue.remove(task);
-					task.setPriority(TASK_MEDIA_UI_PRIORITY);
+					task.setPriority(priority);
 					syncServiceExecutorQueue.offer(task);
 				}
 				return task; // Already in queue
@@ -371,7 +478,7 @@ public class SyncService {
 				return null; // Wait a bit longer...
 			}
 
-			task = (PrioritizedListenableFutureTask<SyncTaskMediaFetcher>) syncServiceExecutorService.submit(new SyncTaskMediaFetcher(context, userInitiated ? TASK_MEDIA_UI_PRIORITY : TASK_MEDIA_PRIORITY, mediaContent));
+			task = (PrioritizedListenableFutureTask<SyncTaskMediaFetcher>) syncServiceExecutorService.submit(new SyncTaskMediaFetcher(context, priority, mediaContent));
 			task.addListener(new PrioritizedTaskListener<SyncTaskMediaFetcher>(task) {
 
 				private void sendBroadcast(MediaContent mediaContent, SyncStatus status) {
@@ -486,10 +593,10 @@ public class SyncService {
 
 	private class PrioritizedListenableFutureTask<V> extends FutureTask<V> implements ListenableFuture<V>, Comparable<PrioritizedListenableFutureTask<V>> {
 		private final ExecutionList executionList = new ExecutionList();
-		private int priority;
+		private long priority;
 		private final Callable<V> callable;
 
-		PrioritizedListenableFutureTask(final Callable<V> callable, int priority) {
+		PrioritizedListenableFutureTask(final Callable<V> callable, long priority) {
 			super(new Callable<V>() {
 				@Override
 				public V call() throws Exception {
@@ -523,7 +630,7 @@ public class SyncService {
 			getTask().status = SyncTask.SyncTaskStatus.QUEUED;
 		}
 
-		PrioritizedListenableFutureTask(final Runnable runnable, final V result, int priority) {
+		PrioritizedListenableFutureTask(final Runnable runnable, final V result, long priority) {
 			this(new Callable<V>() {
 				@Override
 				public V call() throws Exception {
@@ -547,20 +654,20 @@ public class SyncService {
 			this.executionList.execute();
 		}
 
-		int getPriority() {
+		long getPriority() {
 			return priority;
 		}
 
-		void setPriority(int priority) {
+		void setPriority(long priority) {
 			this.priority = priority;
 		}
 
 		@Override
 		public int compareTo(@NonNull PrioritizedListenableFutureTask<V> another) {
 			if (this.getPriority() < another.getPriority()) {
-				return 1;
-			} else if (this.getPriority() > another.getPriority()) {
 				return -1;
+			} else if (this.getPriority() > another.getPriority()) {
+				return 1;
 			}
 			return 0;
 		}
