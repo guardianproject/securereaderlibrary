@@ -25,14 +25,10 @@ public class SyncTaskMediaFetcher extends SyncTask<SyncTaskMediaFetcher> {
 	public final MediaContent mediaContent;
     public File targetFile;
 
-    public SyncTaskMediaFetcher(Context context, long priority, MediaContent mediaContent)
+    public SyncTaskMediaFetcher(Context context, String identifier, long priority, MediaContent mediaContent)
 	{
-		super(context, priority);
+		super(context, identifier, priority);
 		this.mediaContent = mediaContent;
-	}
-
-	public Object getIdentifier() {
-		return mediaContent.getUrl();
 	}
 
 	@Override

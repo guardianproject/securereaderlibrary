@@ -84,7 +84,7 @@ public class Item extends FeedEntity implements Serializable
 				returnDate = format.parse(dateString);
 				break;
 			}
-			catch (ParseException e)
+			catch (Exception e)
 			{
 			}
 		}

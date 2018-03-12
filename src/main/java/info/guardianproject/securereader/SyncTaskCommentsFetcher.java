@@ -31,14 +31,10 @@ public class SyncTaskCommentsFetcher extends SyncTask<SyncTaskCommentsFetcher>
 		void commentsFeedFetchError(Item _item);
 	}
 
-	public SyncTaskCommentsFetcher(Context context, long priority, Item item)
+	public SyncTaskCommentsFetcher(Context context, String identifier, long priority, Item item)
 	{
-		super(context, priority);
+		super(context, identifier, priority);
 		this.item = item;
-	}
-
-	public Object getIdentifier() {
-		return item.getCommentsUrl();
 	}
 
 	@Override

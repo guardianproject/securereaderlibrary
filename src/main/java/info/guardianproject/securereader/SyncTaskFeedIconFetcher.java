@@ -21,14 +21,10 @@ public class SyncTaskFeedIconFetcher extends SyncTask<SyncTaskFeedIconFetcher>
 
 	public Feed feed;
 
-	public SyncTaskFeedIconFetcher(Context context, long priority, Feed feed)
+	public SyncTaskFeedIconFetcher(Context context, String identifier, long priority, Feed feed)
 	{
-		super(context, priority);
+		super(context, identifier, priority);
 		this.feed = feed;
-	}
-
-	public Object getIdentifier() {
-		return feed.getFeedURL();
 	}
 
 	@Override

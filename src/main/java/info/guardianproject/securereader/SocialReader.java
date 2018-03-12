@@ -173,9 +173,6 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	private HttpClient httpClient = null;
 
 	public static final int DEFAULT_NUM_FEED_ITEMS = 200;
-	
-	public static final int MEDIA_ITEM_DOWNLOAD_LIMIT_PER_FEED_PER_SESSION = 5;
-	//mediaItemDownloadLimitPerFeedPerSession
 
 	public long defaultFeedId = -1;
 	public final int feedRefreshAge;
@@ -1390,7 +1387,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 					
 					if (mediaFileSize < mediaCacheSizeLimitInBytes) {
 						
-						ArrayList<Item> itemsToDownload = databaseAdapter.getItemsWithMediaNotDownloaded(MEDIA_ITEM_DOWNLOAD_LIMIT_PER_FEED_PER_SESSION);
+						ArrayList<Item> itemsToDownload = databaseAdapter.getItemsWithMediaNotDownloaded(5); //TODO
 						if (LOGGING) 
 							Log.v(LOGTAG,"Got " + itemsToDownload.size() + " items to download from database");
 						
@@ -1402,7 +1399,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 								if (LOGGING)
 									Log.v(LOGTAG, "Adding to sync " + m.getUrl());
 								
-								syncService.addMediaContentSyncTask(item, m, false, null);
+								syncService.addMediaContentSyncTask(item, -1, m, false, null);
 							}
 						}
 					}
@@ -2101,32 +2098,13 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 
 	public void backgroundDownloadFeedItemMedia(Feed feed)
 	{
-		int count = 0;
-		feed = getFeed(feed);
-		for (Item item : feed.getItems())
-		{
-			if (count >= MEDIA_ITEM_DOWNLOAD_LIMIT_PER_FEED_PER_SESSION) {
-				
-				if (LOGGING)
-					Log.v(LOGTAG, "!!! " + count + " above limit of " + MEDIA_ITEM_DOWNLOAD_LIMIT_PER_FEED_PER_SESSION);
-				
-				break;
-			}
-							
-				if (LOGGING)
-					Log.v(LOGTAG, "Adding " + count + " media item to background feed download");
-				
-				backgroundDownloadItemMedia(item);
-				count++;
-		}
-	}
-	
-	
-	public void backgroundDownloadItemMedia(Item item)
-	{
 		if (syncSettingsForCurrentNetwork().contains(ModeSettings.Sync.Media)) {
-			for (MediaContent contentItem : item.getMediaContent()) {
-				syncService.addMediaContentSyncTask(item, contentItem, false, null);
+			feed = getFeed(feed);
+			for (int itemIndex = 0; itemIndex < feed.getItems().size(); itemIndex++) {
+				Item item = feed.getItems().get(itemIndex);
+				for (MediaContent contentItem : item.getMediaContent()) {
+					syncService.addMediaContentSyncTask(item, itemIndex, contentItem, false, null);
+				}
 			}
 		}
 	}
@@ -2564,7 +2542,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 				} else if (download && forceBitwiseDownload && isOnline() == ONLINE) {
 					if (LOGGING)
 						Log.v(LOGTAG, "File doesn't exist, downloading");
-					syncService.addMediaContentSyncTask(item, mc, true, mdc);
+					syncService.addMediaContentSyncTask(item, -1, mc, true, mdc);
 					return true;
 				}
 				break;

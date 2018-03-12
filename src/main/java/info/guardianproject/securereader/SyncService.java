@@ -3,6 +3,7 @@ package info.guardianproject.securereader;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.Message;
 import android.support.annotation.NonNull;
@@ -35,6 +36,8 @@ import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+
+import info.guardianproject.iocipher.File;
 
 public class SyncService {
 
@@ -119,14 +122,13 @@ public class SyncService {
 		return priority;
 	}
 
-	private long getPriorityForFeed(Feed feed, boolean userInitiated) {
-		return getPriorityForItem(getFeedIndexNumber(feed), 0, null, DownloadType.Feed, userInitiated);
-	}
-
-	private long getPriorityForItem(Item item, DownloadType type, boolean userInitiated) {
+	private long getPriorityForItem(Item item, int itemIndex, DownloadType type, boolean userInitiated) {
 		long feedId = item.getFeedId();
 		Feed feed = socialReader.getFeedById(feedId);
-		return getPriorityForItem(getFeedIndexNumber(feed), getItemIndexNumber(feed, item), item.getPubDate(), type, userInitiated);
+		if (itemIndex == -1) {
+			itemIndex = getItemIndexNumber(feed, item);
+		}
+		return getPriorityForItem(getFeedIndexNumber(feed), itemIndex, item.getPubDate(), type, userInitiated);
 	}
 
 	private long getPriorityForFeed(Feed feed, DownloadType type, boolean userInitiated) {
@@ -149,14 +151,18 @@ public class SyncService {
 	}
 
 	private int getItemIndexNumber(Feed feed, Item item) {
-		return 0; //TODO
+		if (feed != null && item != null) {
+			if (feed.getItems().size() == 0) {
+				socialReader.getFeed(feed);
+			}
+			for (int i = 0; i < feed.getItems().size(); i++) {
+				if (feed.getItems().get(i).getDatabaseId() == item.getDatabaseId()) {
+					return i;
+				}
+			}
+		}
+		return 0;
 	}
-
-	//private static final int TASK_FEED_PRIORITY = 5;
-	//private static final int TASK_FEED_ICON_PRIORITY = 4;
-	//private static final int TASK_MEDIA_PRIORITY = 3;
-	//private static final int TASK_MEDIA_UI_PRIORITY = 10;
-	//private static final int TASK_COMMENTS_PRIORITY = 5;
 
 	public static final String LOGTAG = "SyncService";
 	public static final boolean LOGGING = false;
@@ -178,6 +184,8 @@ public class SyncService {
 	private final Handler handler;
 	private final BlockingQueue<Runnable> syncServiceExecutorQueue;
 	private final SyncServiceExecutorService syncServiceExecutorService;
+	private final HandlerThread taskQueueHandlerThread;
+	private final Handler taskQueueHandler;
 
 	private SyncService(Context context, SocialReader socialReader) {
 		this.context = context;
@@ -203,6 +211,11 @@ public class SyncService {
 				.build();
 		syncServiceExecutorService = new SyncServiceExecutorService(4, 4,
 				5000L, TimeUnit.MILLISECONDS, syncServiceExecutorQueue, threadFactory);
+
+		taskQueueHandlerThread = new HandlerThread("TaskQueueHandler");
+		taskQueueHandlerThread.start();
+		Looper looper = taskQueueHandlerThread.getLooper();
+		taskQueueHandler = new Handler(looper);
 	}
 
 	public void cancelAll() {
@@ -216,29 +229,72 @@ public class SyncService {
 		}
 	}
 
+	public void addFeedSyncTask(final Feed feed, final boolean userInitiated, final SyncTaskFeedFetcher.SyncTaskFeedFetcherCallback callback) {
+		taskQueueHandler.post(new Runnable() {
+			@Override
+			public void run() {
+				_addFeedSyncTask(feed, userInitiated, callback);
+			}
+		});
+	}
+
+	public void addFeedIconSyncTask(final Feed feed, final boolean userInitiated) {
+		taskQueueHandler.post(new Runnable() {
+			@Override
+			public void run() {
+				_addFeedIconSyncTask(feed, userInitiated);
+			}
+		});
+	}
+
+	public void addFeedsSyncTask(final List<Feed> feeds, final boolean userInitiated, final SyncTaskFeedFetcher.SyncTaskFeedFetcherCallback callback) {
+		taskQueueHandler.post(new Runnable() {
+			@Override
+			public void run() {
+				_addFeedsSyncTask(feeds, userInitiated, callback);
+			}
+		});
+	}
+
+	public void addCommentsSyncTask(final Item item, final boolean userInitiated, final SyncTaskCommentsFetcher.SyncServiceCommentsFeedFetchedCallback callback) {
+		taskQueueHandler.post(new Runnable() {
+			@Override
+			public void run() {
+				_addCommentsSyncTask(item, userInitiated, callback);
+			}
+		});
+	}
+
+	public void addMediaContentSyncTask(final Item item, final int itemIndex, final MediaContent mediaContent, final boolean userInitiated, final SyncTaskMediaFetcher.SyncTaskMediaFetcherCallback callback) {
+		taskQueueHandler.post(new Runnable() {
+			@Override
+			public void run() {
+				_addMediaContentSyncTask(item, itemIndex, mediaContent, userInitiated, callback);
+			}
+		});
+	}
+
 	private boolean overTime(SyncTask syncTask) {
 		return syncTask.status == SyncTask.SyncTaskStatus.STARTED &&
 				System.currentTimeMillis() - syncTask.startTime > SyncTask.MAXTIME;
 	}
 
-	private PrioritizedListenableFutureTask getExistingTask(Class<? extends SyncTask> type, Object identifier) {
+	private PrioritizedListenableFutureTask getExistingTask(String identifier) {
 		synchronized (syncServiceExecutorService) {
 			Runnable[] syncList = syncServiceExecutorQueue.toArray(new Runnable[0]);
 			for (Runnable syncListItem : syncList) {
 				if (syncListItem instanceof PrioritizedListenableFutureTask) {
 					PrioritizedListenableFutureTask listenableFutureTask = (PrioritizedListenableFutureTask) syncListItem;
-					if (type.isInstance(listenableFutureTask.getTask())) {
+					if (identifier.equalsIgnoreCase(listenableFutureTask.getTask().identifier)) {
 						SyncTask task = listenableFutureTask.getTask();
-						if (task.getIdentifier().equals(identifier)) {
-							if (overTime(task)) {
-								listenableFutureTask.cancel(true);
-								if (LOGGING)
-									Log.v(LOGTAG, "Task was already in queue but over time");
-							} else {
-								if (LOGGING)
-									Log.v(LOGTAG, "Task already in queue, ignoring");
-								return listenableFutureTask;
-							}
+						if (overTime(task)) {
+							listenableFutureTask.cancel(true);
+							if (LOGGING)
+								Log.v(LOGTAG, "Task was already in queue but over time");
+						} else {
+							if (LOGGING)
+								Log.v(LOGTAG, "Task already in queue, ignoring");
+							return listenableFutureTask;
 						}
 					}
 				}
@@ -247,44 +303,14 @@ public class SyncService {
 		return null;
 	}
 
-	public PrioritizedListenableFutureTask<SyncTaskFeedIconFetcher> addFeedIconSyncTask(Feed feed, boolean userInitiated) {
-				synchronized (syncServiceExecutorService) {
-					PrioritizedListenableFutureTask<SyncTaskFeedIconFetcher> task = getExistingTask(SyncTaskFeedIconFetcher.class, feed.getFeedURL());
-					if (task != null) {
-						return task; // Already in queue
-					}
-					long priority = getPriorityForFeed(feed, DownloadType.FeedIcon, userInitiated);
-			task = (PrioritizedListenableFutureTask<SyncTaskFeedIconFetcher>) syncServiceExecutorService.submit(new SyncTaskFeedIconFetcher(context, priority, feed));
-			task.addListener(new PrioritizedTaskListener<SyncTaskFeedIconFetcher>(task) {
+	private PrioritizedListenableFutureTask<SyncTaskFeedFetcher> _addFeedSyncTask(Feed feed, final boolean userInitiated, final SyncTaskFeedFetcher.SyncTaskFeedFetcherCallback callback) {
+					String identifier = DownloadType.Feed.name() + ":" + feed.getFeedURL();
+					long priority = getPriorityForFeed(feed, DownloadType.Feed, userInitiated);
 
-				private void sendBroadcast(Feed feed, SyncStatus status) {
-					Intent statusIntent = new Intent(BROADCAST_SYNCSERVICE_FEED_ICON_STATUS);
-					statusIntent.putExtra(EXTRA_SYNCSERVICE_FEED, feed);
-					statusIntent.putExtra(EXTRA_SYNCSERVICE_STATUS, status);
-					LocalBroadcastManager.getInstance(context).sendBroadcast(statusIntent);
-				}
-
-				@Override
-				protected void onSuccess(SyncTaskFeedIconFetcher task) {
-					super.onSuccess(task);
-					sendBroadcast(task.feed, SyncStatus.OK);
-				}
-
-				@Override
-				protected void onFailure(SyncTaskFeedIconFetcher task) {
-					super.onFailure(task);
-					sendBroadcast(task.feed, SyncStatus.ERROR_UNKNOWN);
-				}
-			}, MoreExecutors.directExecutor());
-			return task;
-		}
-	}
-
-	public PrioritizedListenableFutureTask<SyncTaskFeedFetcher> addFeedSyncTask(Feed feed, final boolean userInitiated, final SyncTaskFeedFetcher.SyncTaskFeedFetcherCallback callback) {
-		synchronized (syncServiceExecutorService) {
-			PrioritizedListenableFutureTask<SyncTaskFeedFetcher> task = getExistingTask(SyncTaskFeedFetcher.class, feed.getFeedURL());
-			if (task != null) {
-				return task;
+					synchronized (syncServiceExecutorService) {
+						PrioritizedListenableFutureTask<SyncTaskFeedFetcher> task = getExistingTask(identifier);
+						if (task != null) {
+							return task;
 			}
 
 			// If not user initiated, respect error back-off
@@ -292,8 +318,7 @@ public class SyncService {
 				return null; // Wait a bit longer...
 			}
 
-			long priority = getPriorityForFeed(feed, userInitiated);
-			final SyncTaskFeedFetcher feedSyncTask = new SyncTaskFeedFetcher(context, priority, feed);
+			final SyncTaskFeedFetcher feedSyncTask = new SyncTaskFeedFetcher(context, identifier, priority, feed);
 			task = (PrioritizedListenableFutureTask<SyncTaskFeedFetcher>) syncServiceExecutorService.submit(feedSyncTask);
 
 			// Add a listener for the future
@@ -311,8 +336,13 @@ public class SyncService {
 					super.onSuccess(task);
 					// Tell our listeners we are done
 					sendBroadcast(task.feed, task.feed.getStatus());
-					addFeedIconSyncTask(task.feed, userInitiated);
-					SocialReader.getInstance(context).backgroundDownloadFeedItemMedia(task.feed);
+
+					// Need to download icon?
+					File targetFile = new File(socialReader.getFileSystemDir(), SocialReader.FEED_ICON_FILE_PREFIX + task.feed.getDatabaseId());
+					if (!targetFile.exists()) {
+						addFeedIconSyncTask(task.feed, userInitiated);
+					}
+					socialReader.backgroundDownloadFeedItemMedia(task.feed);
 
 					// Call callback on main thread
 					handler.post(new Runnable() {
@@ -344,7 +374,46 @@ public class SyncService {
 		}
 	}
 
-	public ListenableFuture addFeedsSyncTask(List<Feed> feeds, boolean userInitiated, final SyncTaskFeedFetcher.SyncTaskFeedFetcherCallback callback) {
+	private PrioritizedListenableFutureTask<SyncTaskFeedIconFetcher> _addFeedIconSyncTask(Feed feed, boolean userInitiated) {
+		String identifier = DownloadType.FeedIcon.name() + ":" + feed.getFeedURL();
+		long priority = getPriorityForFeed(feed, DownloadType.FeedIcon, userInitiated);
+		synchronized (syncServiceExecutorService) {
+			PrioritizedListenableFutureTask<SyncTaskFeedIconFetcher> task = getExistingTask(identifier);
+			if (task != null) {
+				if (task.priority != priority) {
+					syncServiceExecutorQueue.remove(task);
+					task.setPriority(priority);
+					syncServiceExecutorQueue.offer(task);
+				}
+				return task; // Already in queue
+			}
+			task = (PrioritizedListenableFutureTask<SyncTaskFeedIconFetcher>) syncServiceExecutorService.submit(new SyncTaskFeedIconFetcher(context, identifier, priority, feed));
+			task.addListener(new PrioritizedTaskListener<SyncTaskFeedIconFetcher>(task) {
+
+				private void sendBroadcast(Feed feed, SyncStatus status) {
+					Intent statusIntent = new Intent(BROADCAST_SYNCSERVICE_FEED_ICON_STATUS);
+					statusIntent.putExtra(EXTRA_SYNCSERVICE_FEED, feed);
+					statusIntent.putExtra(EXTRA_SYNCSERVICE_STATUS, status);
+					LocalBroadcastManager.getInstance(context).sendBroadcast(statusIntent);
+				}
+
+				@Override
+				protected void onSuccess(SyncTaskFeedIconFetcher task) {
+					super.onSuccess(task);
+					sendBroadcast(task.feed, SyncStatus.OK);
+				}
+
+				@Override
+				protected void onFailure(SyncTaskFeedIconFetcher task) {
+					super.onFailure(task);
+					sendBroadcast(task.feed, SyncStatus.ERROR_UNKNOWN);
+				}
+			}, MoreExecutors.directExecutor());
+			return task;
+		}
+	}
+
+	private ListenableFuture _addFeedsSyncTask(List<Feed> feeds, boolean userInitiated, final SyncTaskFeedFetcher.SyncTaskFeedFetcherCallback callback) {
 		if (feeds == null || feeds.size() == 0) {
 			if (callback != null) {
 				callback.feedFetched(new Feed());
@@ -354,7 +423,7 @@ public class SyncService {
 
 		List<PrioritizedListenableFutureTask<SyncTaskFeedFetcher>> futures = Lists.newArrayList();
 		for (final Feed feed : feeds) {
-			PrioritizedListenableFutureTask<SyncTaskFeedFetcher> future = addFeedSyncTask(feed, userInitiated, null);
+			PrioritizedListenableFutureTask<SyncTaskFeedFetcher> future = _addFeedSyncTask(feed, userInitiated, null);
 			if (future != null) {
 				futures.add(future);
 			}
@@ -396,13 +465,15 @@ public class SyncService {
 					});
 				}
 			}
-		});
+		}, MoreExecutors.directExecutor());
 		return resultsFuture;
 	}
 
-	public PrioritizedListenableFutureTask<SyncTaskCommentsFetcher> addCommentsSyncTask(Item item, boolean userInitiated, final SyncTaskCommentsFetcher.SyncServiceCommentsFeedFetchedCallback callback) {
+	private PrioritizedListenableFutureTask<SyncTaskCommentsFetcher> _addCommentsSyncTask(Item item, boolean userInitiated, final SyncTaskCommentsFetcher.SyncServiceCommentsFeedFetchedCallback callback) {
+		String identifier = DownloadType.ItemComments.name() + ":" + item.getCommentsUrl();
+		long priority = getPriorityForItem(item, -1, DownloadType.ItemComments, userInitiated);
 		synchronized (syncServiceExecutorService) {
-			PrioritizedListenableFutureTask<SyncTaskCommentsFetcher> task = getExistingTask(SyncTaskCommentsFetcher.class, item.getCommentsUrl());
+			PrioritizedListenableFutureTask<SyncTaskCommentsFetcher> task = getExistingTask(identifier);
 			if (task != null) {
 				return task;
 			}
@@ -412,8 +483,7 @@ public class SyncService {
 				return null; // Wait a bit longer...
 			}
 
-			long priority = getPriorityForItem(item, DownloadType.ItemComments, userInitiated);
-			final SyncTaskCommentsFetcher commentsSyncTask = new SyncTaskCommentsFetcher(context, priority, item);
+			final SyncTaskCommentsFetcher commentsSyncTask = new SyncTaskCommentsFetcher(context, identifier, priority, item);
 			task = (PrioritizedListenableFutureTask<SyncTaskCommentsFetcher>) syncServiceExecutorService.submit(commentsSyncTask);
 
 			// Add a listener for the future
@@ -459,10 +529,11 @@ public class SyncService {
 		}
 	}
 
-	public PrioritizedListenableFutureTask<SyncTaskMediaFetcher> addMediaContentSyncTask(Item item, MediaContent mediaContent, boolean userInitiated, final SyncTaskMediaFetcher.SyncTaskMediaFetcherCallback callback) {
+	private PrioritizedListenableFutureTask<SyncTaskMediaFetcher> _addMediaContentSyncTask(Item item, int itemIndex, MediaContent mediaContent, boolean userInitiated, final SyncTaskMediaFetcher.SyncTaskMediaFetcherCallback callback) {
+		String identifier = DownloadType.ItemMedia.name() + ":" + mediaContent.getUrl();
+		long priority = getPriorityForItem(item, itemIndex, DownloadType.ItemMedia, userInitiated);
 		synchronized (syncServiceExecutorService) {
-			long priority = getPriorityForItem(item, DownloadType.ItemMedia, userInitiated);
-			PrioritizedListenableFutureTask<SyncTaskMediaFetcher> task = getExistingTask(SyncTaskMediaFetcher.class, mediaContent.getUrl());
+			PrioritizedListenableFutureTask<SyncTaskMediaFetcher> task = getExistingTask(identifier);
 			if (task != null) {
 				// Need to change priority?
 				if (task.getPriority() != priority) {
@@ -478,7 +549,7 @@ public class SyncService {
 				return null; // Wait a bit longer...
 			}
 
-			task = (PrioritizedListenableFutureTask<SyncTaskMediaFetcher>) syncServiceExecutorService.submit(new SyncTaskMediaFetcher(context, priority, mediaContent));
+			task = (PrioritizedListenableFutureTask<SyncTaskMediaFetcher>) syncServiceExecutorService.submit(new SyncTaskMediaFetcher(context, identifier, priority, mediaContent));
 			task.addListener(new PrioritizedTaskListener<SyncTaskMediaFetcher>(task) {
 
 				private void sendBroadcast(MediaContent mediaContent, SyncStatus status) {
@@ -567,7 +638,7 @@ public class SyncService {
 						syncTask.status = SyncTask.SyncTaskStatus.ERROR;
 					}
 				}
-			});
+			}, MoreExecutors.directExecutor());
 			debugQueue();
 			return ret;
 		}
@@ -701,7 +772,8 @@ public class SyncService {
 	}
 
 	public boolean isFeedSyncing(Feed feed) {
-		PrioritizedListenableFutureTask<SyncTaskFeedFetcher> task = getExistingTask(SyncTaskFeedFetcher.class, feed.getFeedURL());
+		String identifier = DownloadType.Feed.name() + ":" + feed.getFeedURL();
+		PrioritizedListenableFutureTask<SyncTaskFeedFetcher> task = getExistingTask(identifier);
 		return (task != null);
 	}
 

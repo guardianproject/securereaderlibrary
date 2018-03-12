@@ -27,23 +27,27 @@ import info.guardianproject.iocipher.FileOutputStream;
 
 abstract public class SyncTask<T> implements Callable<T> {
     public static final long MAXTIME = 3600000; // 60 * 60 * 1000 = 1 hour;
-    public final static boolean LOGGING = false;
+    public static String LOGTAG = "SyncTask";
+    public final static boolean LOGGING = true;
 
     public enum SyncTaskStatus {
         ERROR, CREATED, QUEUED, STARTED, FINISHED, CANCELLED
     };
-    public long priority;
     public SyncTaskStatus status = SyncTaskStatus.CREATED;
     public long startTime = -1;
 
     private final Context context;
+    public long priority;
+    public String identifier;
 
-    public SyncTask(Context context, long priority) {
+    public SyncTask(Context context, String identifier, long priority) {
         this.context = context;
+        this.identifier = identifier;
         this.priority = priority;
+        if (LOGGING) {
+            Log.d(LOGTAG, "Create sync task " + identifier + " prio " + String.valueOf(priority));
+        }
     }
-
-    public abstract Object getIdentifier();
 
     protected Context getContext() {
         return context;

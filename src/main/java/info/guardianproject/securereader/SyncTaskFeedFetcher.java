@@ -22,14 +22,10 @@ public class SyncTaskFeedFetcher extends SyncTask<SyncTaskFeedFetcher>
 		void feedFetchError(Feed _feed);
 	}
 
-	public SyncTaskFeedFetcher(Context context, long priority, Feed feed)
+	public SyncTaskFeedFetcher(Context context, String identifier, long priority, Feed feed)
 	{
-		super(context, priority);
+		super(context, identifier, priority);
 		this.feed = feed;
-	}
-
-	public Object getIdentifier() {
-		return feed.getFeedURL();
 	}
 
 	@Override

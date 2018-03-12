@@ -66,9 +66,13 @@
 	<string name="pref_default_everything_sync_frequency">@string/pref_key_sync_frequency_inbackground</string>
 	<string-array name="pref_default_everything_sync_over_wifi">
 		<item>@string/pref_key_sync_summaries</item>
+		<item>@string/pref_key_sync_full_text</item>
+		<item>@string/pref_key_sync_media</item>
 	</string-array>
 	<string-array name="pref_default_everything_sync_over_data">
 		<item>@string/pref_key_sync_summaries</item>
+		<item>@string/pref_key_sync_full_text</item>
+		<item>@string/pref_key_sync_media</item>
 	</string-array>
 	<bool name="pref_default_everything_media_rich">true</bool>
 	<string name="pref_default_everything_article_expiration">@string/pref_key_article_expiration_oneweek</string>
