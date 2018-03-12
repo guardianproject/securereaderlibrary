@@ -16,6 +16,10 @@ import info.guardianproject.cacheword.CacheWordHandler;
 import info.guardianproject.cacheword.Constants;
 import info.guardianproject.cacheword.ICacheWordSubscriber;
 import info.guardianproject.cacheword.IOCipherMountHelper;
+import info.guardianproject.iocipher.File;
+import info.guardianproject.iocipher.FileInputStream;
+import info.guardianproject.iocipher.FileOutputStream;
+import info.guardianproject.iocipher.FileWriter;
 import info.guardianproject.netcipher.client.StrongBuilder;
 import info.guardianproject.netcipher.client.StrongHttpClientBuilder;
 import info.guardianproject.netcipher.proxy.OrbotHelper;
@@ -26,18 +30,8 @@ import info.guardianproject.securereader.HTMLRSSFeedFinder.RSSFeed;
 import info.guardianproject.securereader.Settings.ProxyType;
 import info.guardianproject.securereader.SyncTaskFeedFetcher.SyncTaskFeedFetcherCallback;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.BufferedWriter;
-import java.io.ByteArrayInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.ObjectOutputStream;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.UnsupportedEncodingException;
-import java.io.Writer;
+import java.io.*;
+import java.io.FilenameFilter;
 import java.net.URLEncoder;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -84,6 +78,7 @@ import com.tinymission.rss.ItemToRSS;
 import com.tinymission.rss.MediaContent;
 import com.tinymission.rss.Comment;
 
+import org.apache.commons.io.FileUtils;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -405,7 +400,6 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
     				
     	        	checkOPML();
     				backgroundSyncSubscribedFeeds();
-    				checkMediaDownloadQueue();
     			} else {
     				if (LOGGING)
     					Log.v(LOGTAG, "App in background and sync frequency not set to background");
@@ -414,7 +408,6 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
     			if (LOGGING)
     				Log.v(LOGTAG, "Sync Frequency manual, not taking action");
     		}
-			expireOldContent();
         }
 	}
 	TimerHandler timerHandler = new TimerHandler();
@@ -596,11 +589,6 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 					}
 				);
 		}
-	}
-	
-	public void feedSubscriptionsChanged() {
-		clearMediaDownloadQueue();
-		checkMediaDownloadQueue();
 	}
 
 	private void expireOldContent() {
@@ -1204,7 +1192,6 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		if (syncService != null) {
 			if (LOGGING)
 				Log.v(LOGTAG,"syncService != null");
-			// TODO - Check errors and backoff info
 			syncService.addFeedSyncTask(feed, false, callback);
 		} else {
 			if (LOGGING)
@@ -1256,17 +1243,19 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		if (LOGGING)
 			Log.v(LOGTAG,"backgroundSyncSubscribedFeeds()");
 
+		expireOldContent();
+
 		if (!cacheWord.isLocked()) {
 			final ArrayList<Feed> feeds = getSubscribedFeedsList();
-			
-			if (LOGGING) 
+
+			if (LOGGING)
 				Log.v(LOGTAG,"Num Subscribed feeds:" + feeds.size());
-			
+
 			for (Feed feed : feeds)
 			{
-				if (LOGGING) 
+				if (LOGGING)
 					Log.v(LOGTAG,"Checking: " + feed.getFeedURL());
-				
+
 				if (feed.isSubscribed() && shouldRefresh(feed) && isOnline() == ONLINE) {
 					if (LOGGING)
 						Log.v(LOGTAG,"It should be refreshed");
@@ -1341,73 +1330,17 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	}
 	
 	public void clearMediaDownloadQueue() {
-		if (LOGGING) 
+		//TODO
+/*		if (LOGGING)
 			Log.v(LOGTAG, "clearMediaDownloadQueue");		
 		
 		if (!cacheWord.isLocked() && isOnline() == ONLINE && syncService != null) {
 				
 			syncService.cancelAll();
 			backgroundSyncSubscribedFeeds();
-		}
+		}*/
 		
 	}	
-
-	public void checkMediaDownloadQueue() {
-		if (LOGGING) 
-			Log.v(LOGTAG, "checkMediaDownloadQueue");		
-		
-		if (!cacheWord.isLocked() && syncService != null && syncSettingsForCurrentNetwork().contains(ModeSettings.Sync.Media)) {
-			
-			if (LOGGING) 
-				Log.v(LOGTAG, "In right state, definitely checkMediaDownloadQueue");
-				
-			int numWaiting = syncService.getNumWaitingToSync();
-			
-			if (LOGGING) 
-				Log.v(LOGTAG, "Num Waiting TO Sync: " + numWaiting);
-			
-			if (numWaiting > 0) {
-				// Send a no-op to get any going that should be going?
-				
-			} else {
-				
-				// Check database for new items to sync
-				if (databaseAdapter != null && databaseAdapter.databaseReady())
-				{
-					// Delete over limit media
-					int numDeleted = databaseAdapter.deleteOverLimitMedia(mediaCacheSizeLimitInBytes, this);
-					
-					if (LOGGING)
-						Log.v(LOGTAG,"Deleted " + numDeleted + " over limit media items");
-					
-					long mediaFileSize = databaseAdapter.mediaFileSize();
-					
-					if (LOGGING)
-						Log.v(LOGTAG,"Media File Size: " + mediaFileSize + " limit is " + mediaCacheSizeLimitInBytes);
-					
-					if (mediaFileSize < mediaCacheSizeLimitInBytes) {
-						
-						ArrayList<Item> itemsToDownload = databaseAdapter.getItemsWithMediaNotDownloaded(5); //TODO
-						if (LOGGING) 
-							Log.v(LOGTAG,"Got " + itemsToDownload.size() + " items to download from database");
-						
-						for (Item item : itemsToDownload)
-						{
-							ArrayList<MediaContent> mc = item.getMediaContent();
-							for (MediaContent m : mc) {
-								
-								if (LOGGING)
-									Log.v(LOGTAG, "Adding to sync " + m.getUrl());
-								
-								syncService.addMediaContentSyncTask(item, -1, m, false, null);
-							}
-						}
-					}
-				}	
-			}
-		}
-		
-	}
 
 	boolean _manualSyncInProgress = false;
 	public boolean manualSyncInProgress() {
@@ -1416,6 +1349,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 
 	public boolean manualSyncSubscribedFeeds(final FeedFetcher.FeedFetchedCallback _finalCallback)
 	{
+		expireOldContent();
 		if (!_manualSyncInProgress && isOnline() == ONLINE)
 		{
 			final ArrayList<Feed> feeds = getSubscribedFeedsList();
@@ -2093,19 +2027,6 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		{
 			if (LOGGING)
 				Log.e(LOGTAG,"Database not ready: setFeedAndItemData");
-		}
-	}
-
-	public void backgroundDownloadFeedItemMedia(Feed feed)
-	{
-		if (syncSettingsForCurrentNetwork().contains(ModeSettings.Sync.Media)) {
-			feed = getFeed(feed);
-			for (int itemIndex = 0; itemIndex < feed.getItems().size(); itemIndex++) {
-				Item item = feed.getItems().get(itemIndex);
-				for (MediaContent contentItem : item.getMediaContent()) {
-					syncService.addMediaContentSyncTask(item, itemIndex, contentItem, false, null);
-				}
-			}
 		}
 	}
 
@@ -2981,7 +2902,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 			boolean offlineMode = (settings.mode() == Settings.Mode.Offline);
 			boolean batteryTooLow = (settings.getCurrentMode().powerSaveEnabled() && settings.getCurrentMode().powersavePercentage() >= (currentBatteryLevel * 100f));
 			if (isOnline() != ONLINE && !offlineMode && !batteryTooLow) {
-
+				backgroundSyncSubscribedFeeds();
 			}
 		}
 	}
@@ -3065,5 +2986,21 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		{
 			databaseAdapter.setSyncStatus(dbObject, error);
 		}
+	}
+
+	public long currentMediaCacheSize() {
+		long cb = 0;
+		info.guardianproject.iocipher.File[] media = getFileSystemDir().listFiles(new info.guardianproject.iocipher.FilenameFilter() {
+			@Override
+			public boolean accept(File file, String s) {
+				return s.startsWith(MEDIA_CONTENT_FILE_PREFIX);
+			}
+		});
+		if (media != null) {
+			for (info.guardianproject.iocipher.File file : media) {
+				cb += file.length();
+			}
+		}
+		return cb;
 	}
 }
