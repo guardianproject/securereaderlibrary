@@ -275,7 +275,7 @@ public class Reader
 						if (response.getStatusLine().getStatusCode() == 304) {
 							// Not updated on server, so no need to update
 							// TODO update sync status with new pull date?
-							return null;
+							return socialReader.getFeed(feed);
 						} else if (response.getStatusLine().getStatusCode() == 404) {
 							feed.setStatus(SyncStatus.ERROR_NOT_FOUND);
 						} else {

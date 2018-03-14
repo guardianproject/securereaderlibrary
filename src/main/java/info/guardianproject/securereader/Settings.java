@@ -21,8 +21,7 @@ import com.google.common.collect.Lists;
 
 import static info.guardianproject.securereader.Settings.Mode.Everything;
 
-public class Settings
-{
+public class Settings implements SharedPreferences.OnSharedPreferenceChangeListener {
 	public static final String LOGTAG = "Settings";
 	public static final boolean LOGGING = false;
 
@@ -75,6 +74,7 @@ public class Settings
 		KEY_UI_LANGUAGE = context.getString(R.string.pref_key_language);
 
 		mPrefs = PreferenceManager.getDefaultSharedPreferences(context);
+		mPrefs.registerOnSharedPreferenceChangeListener(this);
 		modeOptimized = new ModeSettings(context, getModeFilename(Mode.Optimized));
 		modeEverything = new ModeSettings(context, getModeFilename(Mode.Everything));
 		modeOffline = new ModeSettings(context, getModeFilename(Mode.Offline));
@@ -138,11 +138,22 @@ public class Settings
 	public void registerChangeListener(SharedPreferences.OnSharedPreferenceChangeListener listener)
 	{
 		mPrefs.registerOnSharedPreferenceChangeListener(listener);
+		modeOptimized.registerChangeListener(listener);
+		modeEverything.registerChangeListener(listener);
 	}
 
 	public void unregisterChangeListener(SharedPreferences.OnSharedPreferenceChangeListener listener)
 	{
 		mPrefs.unregisterOnSharedPreferenceChangeListener(listener);
+		modeOptimized.unregisterChangeListener(listener);
+		modeEverything.unregisterChangeListener(listener);
+	}
+
+	@Override
+	public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
+		if (KEY_MODE.equalsIgnoreCase(key)) {
+			setCurrentMode();
+		}
 	}
 
 	public enum Mode

@@ -28,7 +28,7 @@ import info.guardianproject.iocipher.FileOutputStream;
 abstract public class SyncTask<T> implements Callable<T> {
     public static final long MAXTIME = 3600000; // 60 * 60 * 1000 = 1 hour;
     public static String LOGTAG = "SyncTask";
-    public final static boolean LOGGING = true;
+    public final static boolean LOGGING = false;
 
     public enum SyncTaskStatus {
         ERROR, CREATED, QUEUED, STARTED, FINISHED, CANCELLED

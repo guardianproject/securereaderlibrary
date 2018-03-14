@@ -74,7 +74,7 @@ public class SyncService {
     }
 
     public static final String LOGTAG = "SyncService";
-    public static final boolean LOGGING = true;
+    public static final boolean LOGGING = false;
     public static final boolean LOGGING_QUEUE = false;
 
     // Backoff times in seconds
@@ -129,9 +129,10 @@ public class SyncService {
     }
 
     public void cancelAll() {
-        Runnable[] syncList = new Runnable[syncServiceExecutorQueue.size()];
-        syncServiceExecutorQueue.toArray(syncList);
         synchronized (syncServiceExecutorService) {
+            taskQueueHandler.removeCallbacksAndMessages(null);
+            Runnable[] syncList = new Runnable[syncServiceExecutorQueue.size()];
+            syncServiceExecutorQueue.toArray(syncList);
             for (Runnable syncListItem : syncList) {
                 ((PrioritizedListenableFutureTask) syncListItem).cancel(true);
             }
@@ -140,43 +141,51 @@ public class SyncService {
     }
 
     public void addFeedSyncTask(final Feed feed, final boolean userInitiated, final SyncTaskFeedFetcher.SyncTaskFeedFetcherCallback callback) {
-        taskQueueHandler.post(new Runnable() {
-            @Override
-            public void run() {
-                _addFeedSyncTask(feed, userInitiated, callback);
-            }
-        });
+        if (socialReader.shouldSync(ModeSettings.Sync.Summary, userInitiated)) {
+            taskQueueHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    _addFeedSyncTask(feed, userInitiated, callback);
+                }
+            });
+        }
     }
 
     private void addFeedIconSyncTask(final Feed feed, final boolean userInitiated) {
-        taskQueueHandler.post(new Runnable() {
-            @Override
-            public void run() {
-                _addFeedIconSyncTask(feed, userInitiated);
-            }
-        });
+        if (socialReader.shouldSync(ModeSettings.Sync.Summary, userInitiated)) {
+            taskQueueHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    _addFeedIconSyncTask(feed, userInitiated);
+                }
+            });
+        }
     }
 
     public void addFeedsSyncTask(final List<Feed> feeds, final boolean userInitiated, final SyncTaskFeedFetcher.SyncTaskFeedFetcherCallback callback) {
-        taskQueueHandler.post(new Runnable() {
-            @Override
-            public void run() {
-                _addFeedsSyncTask(feeds, userInitiated, callback);
-            }
-        });
+        if (socialReader.shouldSync(ModeSettings.Sync.Summary, userInitiated)) {
+            taskQueueHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    _addFeedsSyncTask(feeds, userInitiated, callback);
+                }
+            });
+        }
     }
 
     public void addCommentsSyncTask(final Item item, final boolean userInitiated, final SyncTaskCommentsFetcher.SyncServiceCommentsFeedFetchedCallback callback) {
-        taskQueueHandler.post(new Runnable() {
-            @Override
-            public void run() {
-                _addCommentsSyncTask(item, userInitiated, callback);
-            }
-        });
+        if (socialReader.shouldSync(ModeSettings.Sync.FullText, userInitiated)) { // TODO - add another enum for comments?
+            taskQueueHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    _addCommentsSyncTask(item, userInitiated, callback);
+                }
+            });
+        }
     }
 
     public void addMediaContentSyncTask(final Item item, final int itemIndex, final MediaContent mediaContent, final boolean userInitiated, final SyncTaskMediaFetcher.SyncTaskMediaFetcherCallback callback) {
-        if (socialReader.syncSettingsForCurrentNetwork().contains(ModeSettings.Sync.Media)) {
+        if (socialReader.shouldSync(ModeSettings.Sync.Media, userInitiated)) {
             taskQueueHandler.post(new Runnable() {
                 @Override
                 public void run() {
@@ -190,8 +199,18 @@ public class SyncService {
         }
     }
 
-    private static PriorityComponent[] priorityScheme = new PriorityComponent[]{PriorityComponent.USER_INITIATED, PriorityComponent.DATE_RANGE, PriorityComponent.TYPE, PriorityComponent.ITEM_NUMBER, PriorityComponent.FEED_NUMBER};
-    private static DownloadType[] prioritySchemeTypes = new DownloadType[]{DownloadType.Feed, DownloadType.FeedIcon, DownloadType.ItemText, DownloadType.ItemMedia, DownloadType.ItemComments};
+    private PriorityComponent[] priorityScheme = new PriorityComponent[]{PriorityComponent.USER_INITIATED, PriorityComponent.DATE_RANGE, PriorityComponent.TYPE, PriorityComponent.ITEM_NUMBER, PriorityComponent.FEED_NUMBER};
+    private DownloadType[] prioritySchemeTypesMediaRich = new DownloadType[]{DownloadType.Feed, DownloadType.FeedIcon, DownloadType.ItemMedia, DownloadType.ItemText, DownloadType.ItemComments};
+    private DownloadType[] prioritySchemeTypesDefault = new DownloadType[]{DownloadType.Feed, DownloadType.FeedIcon, DownloadType.ItemText, DownloadType.ItemMedia, DownloadType.ItemComments};
+    private DownloadType[] prioritySchemeTypes = prioritySchemeTypesDefault;
+
+    public void setMediaRich(boolean mediaRich) {
+        if (mediaRich) {
+            prioritySchemeTypes = prioritySchemeTypesMediaRich;
+        } else {
+            prioritySchemeTypes = prioritySchemeTypesDefault;
+        }
+    }
 
     private long getPriorityForItem(int feedNumber, int itemNumber, Date itemDate, DownloadType type, boolean userInitiated) {
 
@@ -362,7 +381,7 @@ public class SyncService {
                     for (int itemIndex = 0; itemIndex < task.feed.getItems().size(); itemIndex++) {
                         Item item = task.feed.getItems().get(itemIndex);
                         for (MediaContent contentItem : item.getMediaContent()) {
-                            addMediaContentSyncTask(item, itemIndex, contentItem, false, null);
+                            addMediaContentSyncTask(item, itemIndex, contentItem, userInitiated, null);
                         }
                     }
 
@@ -809,6 +828,21 @@ public class SyncService {
         String identifier = DownloadType.Feed.name() + ":" + feed.getFeedURL();
         PrioritizedListenableFutureTask<SyncTaskFeedFetcher> task = getExistingTask(identifier);
         return (task != null);
+    }
+
+    public boolean anyFeedSyncing() {
+        synchronized (syncServiceExecutorService) {
+            Runnable[] syncList = syncServiceExecutorQueue.toArray(new Runnable[0]);
+            for (Runnable syncListItem : syncList) {
+                if (syncListItem instanceof PrioritizedListenableFutureTask) {
+                    PrioritizedListenableFutureTask listenableFutureTask = (PrioritizedListenableFutureTask) syncListItem;
+                    if (listenableFutureTask.getTask() instanceof SyncTaskFeedFetcher) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     public void cancelAllForFeed(Feed feed) {

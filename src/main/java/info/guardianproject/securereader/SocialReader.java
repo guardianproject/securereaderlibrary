@@ -28,10 +28,8 @@ import info.guardianproject.netcipher.proxy.PsiphonHelper;
 import info.guardianproject.iocipher.*;
 import info.guardianproject.securereader.HTMLRSSFeedFinder.RSSFeed;
 import info.guardianproject.securereader.Settings.ProxyType;
-import info.guardianproject.securereader.SyncTaskFeedFetcher.SyncTaskFeedFetcherCallback;
 
 import java.io.*;
-import java.io.FilenameFilter;
 import java.net.URLEncoder;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -55,9 +53,7 @@ import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.database.Cursor;
-import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.drawable.BitmapDrawable;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
@@ -78,7 +74,6 @@ import com.tinymission.rss.ItemToRSS;
 import com.tinymission.rss.MediaContent;
 import com.tinymission.rss.Comment;
 
-import org.apache.commons.io.FileUtils;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -94,7 +89,7 @@ import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathFactory;
 
-public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnSharedPreferenceChangeListener {
+public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnSharedPreferenceChangeListener, SyncTaskFeedFetcher.SyncTaskFeedFetcherCallback {
 
 	public interface SocialReaderLockListener
 	{
@@ -214,7 +209,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	PsiphonHelper psiphonHelper;
 	
 	Item talkItem = null;
-	float currentBatteryLevel = 1.0f;
+	int currentBatteryLevel = -1;
 
 	private SocialReader(Context _context) {
 		
@@ -303,11 +298,20 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 					Log.v(LOGTAG,"onReceive " + intent.getAction());
 				int level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
 				int scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
-				currentBatteryLevel = level / (float)scale;
-				onBatteryLevelChanged();
+				int previousBatteryLevel = currentBatteryLevel;
+				currentBatteryLevel = (int)(100f * level / (float)scale);
+				if (settings.currentMode.powerSaveEnabled()) {
+					if (previousBatteryLevel == -1) {
+						onBatteryLevelChanged();
+					} else if (currentBatteryLevel <= settings.currentMode.powersavePercentage() && previousBatteryLevel > settings.currentMode.powersavePercentage()) {
+						onBatteryLevelChanged();
+					} else if (currentBatteryLevel > settings.currentMode.powersavePercentage() && previousBatteryLevel <= settings.currentMode.powersavePercentage()) {
+						onBatteryLevelChanged();
+					}
+				}
 			}
 		};
-		applicationContext.registerReceiver(psiphonHelperReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+		applicationContext.registerReceiver(batteryStatusReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
 	}
 		
     private static SocialReader socialReader = null;
@@ -451,6 +455,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 			initHttpClient(applicationContext);
 
 			syncService = SyncService.getInstance(applicationContext, this);
+			syncService.setMediaRich(settings.getCurrentMode().mediaRich());
 
             periodicTask = new TimerTask() {
                 @Override
@@ -987,6 +992,27 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		return settings.getCurrentMode().syncData();
 	}
 
+	public boolean shouldSync(ModeSettings.Sync syncType, boolean userInitiated) {
+		if (syncService != null && isOnline() == ONLINE) {
+			if (userInitiated) {
+				return true;
+			} else if (socialReader.syncSettingsForCurrentNetwork().contains(syncType)) {
+				if (batteryTooLowForSync()) {
+					if (LOGGING)
+						Log.d(LOGTAG, "Battery too low for sync");
+					return false;
+				}
+				if (mediaCacheSizeLimitInBytes > 0 && currentMediaCacheSize() >= mediaCacheSizeLimitInBytes) {
+					if (LOGGING)
+						Log.d(LOGTAG, "Media cache too large for sync");
+					return false;
+				}
+				return true;
+			}
+		}
+		return false;
+	}
+
 
 	// This public method will indicate whether or not the application is online
 	// it takes into account whether or not the application should be online (connectionMode)
@@ -1182,24 +1208,6 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	}
 
 	/*
-	 * Utilizes the SyncService to Requests feed and feed items to be pulled from the network
-	 */
-	private void backgroundRequestFeedNetwork(Feed feed, SyncTaskFeedFetcherCallback callback)
-	{
-		if (LOGGING)
-			Log.v(LOGTAG,"requestFeedNetwork");
-
-		if (syncService != null) {
-			if (LOGGING)
-				Log.v(LOGTAG,"syncService != null");
-			syncService.addFeedSyncTask(feed, false, callback);
-		} else {
-			if (LOGGING)
-				Log.v(LOGTAG,"syncService is null!");
-		}
-	}
-
-	/*
 	 * Requests feed and feed items to be pulled from the network returns false
 	 * if feed cannot be requested from the network
 	 */
@@ -1245,54 +1253,20 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 
 		expireOldContent();
 
-		if (!cacheWord.isLocked()) {
+		if (!cacheWord.isLocked() && syncService != null) {
 			final ArrayList<Feed> feeds = getSubscribedFeedsList();
 
 			if (LOGGING)
 				Log.v(LOGTAG,"Num Subscribed feeds:" + feeds.size());
 
-			for (Feed feed : feeds)
-			{
-				if (LOGGING)
-					Log.v(LOGTAG,"Checking: " + feed.getFeedURL());
-
+			for (Feed feed : feeds) {
 				if (feed.isSubscribed() && shouldRefresh(feed) && isOnline() == ONLINE) {
-					if (LOGGING)
-						Log.v(LOGTAG,"It should be refreshed");
-
-					backgroundRequestFeedNetwork(feed, new SyncTaskFeedFetcherCallback() {
-						@Override
-						public void feedFetched(Feed _feed) {
-							if (feedsWithComments != null)
-							{
-								if (LOGGING) 
-									Log.v(LOGTAG,"Does " + _feed.getFeedURL() + " = " + feedsWithComments[0]);
-								
-								if (Arrays.asList(feedsWithComments).contains(_feed.getFeedURL())) {
-									if (LOGGING)
-										Log.v(LOGTAG, "Checking Comments on " + _feed.getDatabaseId());
-									networkCheckCommentFeeds(_feed);
-								}
-							}
-							else if (LOGGING)
-								Log.e(LOGTAG,"feedsWithComments is null!!!");
-						}
-
-						@Override
-						public void feedFetchError(Feed _feed) {
-						}
-					});
-				} else if (isOnline() != ONLINE) {
-					if (LOGGING)
-						Log.v(LOGTAG,"not refreshing, not online: " + isOnline());
-				} else {
-					if (LOGGING)
-						Log.v(LOGTAG,"doesn't need refreshing");
+					syncService.addFeedSyncTask(feed, false, this);
 				}
 			}
-			
+
 			// Check Talk Feed
-			if (isOnline() == ONLINE && syncService != null && talkItem != null && !TextUtils.isEmpty(talkItem.getCommentsUrl())) {
+			if (isOnline() == ONLINE && talkItem != null && !TextUtils.isEmpty(talkItem.getCommentsUrl())) {
 				if (LOGGING)
 					Log.v(LOGTAG,"Adding talkItem to syncService");
 				syncService.addCommentsSyncTask(talkItem, false, null);
@@ -2287,6 +2261,8 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		if (syncService != null)
 		{
 			//syncService.stopSelf();
+			syncService.cancelAll();
+			syncService = null;
 			applicationContext.stopService(new Intent(applicationContext, SyncService.class));
 			initialized = false;
 		}
@@ -2460,13 +2436,13 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 					if (mdc != null)
 						mdc.mediaDownloaded(mc, possibleFile);
 					return true;
-				} else if (download && forceBitwiseDownload && isOnline() == ONLINE) {
+				} else if (download && forceBitwiseDownload && isOnline() == ONLINE) { //TODO check shouldSync?
 					if (LOGGING)
 						Log.v(LOGTAG, "File doesn't exist, downloading");
 					syncService.addMediaContentSyncTask(item, -1, mc, true, mdc);
 					return true;
 				}
-				break;
+				return false;
 		}
 		if (LOGGING)
 			Log.v(LOGTAG, "Not a media type we support: " + mc.getType());
@@ -2831,7 +2807,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 			// Get from database;
 			if (databaseAdapter != null && databaseAdapter.databaseReady())
 			{
-				Feed dbFeed = databaseAdapter.getFeedItems(_feed, DEFAULT_NUM_FEED_ITEMS);			
+				Feed dbFeed = databaseAdapter.getFeedItems(_feed, -1);
 				for (Item item : dbFeed.getItems()) {
 					syncService.addCommentsSyncTask(item, false, null);
 				}
@@ -2897,14 +2873,19 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 
 	private void sync() {
 		if (syncService != null) {
+			syncService.setMediaRich(settings.getCurrentMode().mediaRich());
 			syncService.cancelAll();
 
 			boolean offlineMode = (settings.mode() == Settings.Mode.Offline);
-			boolean batteryTooLow = (settings.getCurrentMode().powerSaveEnabled() && settings.getCurrentMode().powersavePercentage() >= (currentBatteryLevel * 100f));
-			if (isOnline() != ONLINE && !offlineMode && !batteryTooLow) {
+			boolean batteryTooLow = batteryTooLowForSync();
+			if (isOnline() == ONLINE && !offlineMode && !batteryTooLow) {
 				backgroundSyncSubscribedFeeds();
 			}
 		}
+	}
+
+	private boolean batteryTooLowForSync() {
+		return (settings.getCurrentMode().powerSaveEnabled() && settings.getCurrentMode().powersavePercentage() >= currentBatteryLevel);
 	}
 
 	private void onBatteryLevelChanged() {
@@ -3002,5 +2983,19 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 			}
 		}
 		return cb;
+	}
+
+	@Override
+	public void feedFetched(Feed feed) {
+		if (feedsWithComments != null && Arrays.asList(feedsWithComments).contains(feed.getFeedURL())) {
+			if (LOGGING)
+				Log.v(LOGTAG, "Checking Comments on " + feed.getDatabaseId());
+			networkCheckCommentFeeds(feed);
+		}
+	}
+
+	@Override
+	public void feedFetchError(Feed feed) {
+
 	}
 }
