@@ -185,7 +185,7 @@ public class SyncService {
     }
 
     public void addMediaContentSyncTask(final Item item, final int itemIndex, final MediaContent mediaContent, final boolean userInitiated, final SyncTaskMediaFetcher.SyncTaskMediaFetcherCallback callback) {
-        if (socialReader.shouldSync(ModeSettings.Sync.Media, userInitiated)) {
+        if (socialReader.shouldSync((mediaContent.getMediaContentType() == MediaContent.MediaContentType.FULLTEXT) ? ModeSettings.Sync.FullText : ModeSettings.Sync.Media, userInitiated)) {
             taskQueueHandler.post(new Runnable() {
                 @Override
                 public void run() {
@@ -584,7 +584,7 @@ public class SyncService {
         }
 
         String identifier = DownloadType.ItemMedia.name() + ":" + mediaContent.getUrl();
-        long priority = getPriorityForItem(item, itemIndex, DownloadType.ItemMedia, userInitiated);
+        long priority = getPriorityForItem(item, itemIndex, (mediaContent.getMediaContentType() == MediaContent.MediaContentType.FULLTEXT) ? DownloadType.ItemText : DownloadType.ItemMedia, userInitiated);
         synchronized (syncServiceExecutorService) {
             PrioritizedListenableFutureTask<SyncTaskMediaFetcher> task = getExistingTask(identifier);
             if (task != null) {

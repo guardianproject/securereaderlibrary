@@ -15,7 +15,7 @@ public class MediaContent extends FeedEntity implements Serializable
 {
 	public static final long serialVersionUID = 133703L;
 
-	public enum MediaContentType { IMAGE, VIDEO, AUDIO, APPLICATION, EPUB, UNKNOWN };
+	public enum MediaContentType { IMAGE, VIDEO, AUDIO, APPLICATION, EPUB, FULLTEXT, UNKNOWN };
 	 
 	 /* 
 	 * private MediaContentType mType = MediaContentType.IMAGE; private int
@@ -29,7 +29,8 @@ public class MediaContent extends FeedEntity implements Serializable
 	 * public int getResId() { return mResId; }
 	 */
 	public static final int DEFAULT_DATABASE_ID = -1;
-	
+	public static final String FULL_TEXT_TYPE = "app://internal/fulltext";
+
 	private long itemDatabaseId;
 	private long databaseId = DEFAULT_DATABASE_ID;
 
@@ -438,7 +439,9 @@ public class MediaContent extends FeedEntity implements Serializable
 
 	public MediaContentType getMediaContentType() 
 	{
-		if (getType() != null && getType().equals("application/vnd.android.package-archive")) 
+		if (getType() != null && getType().equalsIgnoreCase(FULL_TEXT_TYPE)) {
+			return MediaContentType.FULLTEXT;
+		} else if (getType() != null && getType().equals("application/vnd.android.package-archive"))
 		{
 			return MediaContentType.APPLICATION;
 		}

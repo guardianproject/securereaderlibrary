@@ -396,6 +396,7 @@ public class Reader
 					_entityStack.add(item);
 					if (LOGGING)
 						Log.v(LOGTAG,"Found item");
+
 					feed.addItem(item);
 					currentMediaGroup = 0;
 					currentMediaGroupCounter = 0;
@@ -533,6 +534,13 @@ public class Reader
 			{
 				if (qName.equals("media:group")) {
 					currentMediaGroup = 0;
+				} else if (qName.equals("item") || qName.equals("entry")) {
+					Item item = (Item)_entityStack.pop();
+					if (item != null && item.getLink() != null) {
+						// Add full text media content
+						MediaContent mediaContent = new MediaContent(MediaContent.DEFAULT_DATABASE_ID, item.getLink(), MediaContent.FULL_TEXT_TYPE);
+						item.addMediaContent(mediaContent);
+					}
 				} else {
 					_entityStack.pop();
 				}
