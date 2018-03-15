@@ -189,10 +189,6 @@ public class SyncService {
             taskQueueHandler.post(new Runnable() {
                 @Override
                 public void run() {
-                    long mediaCacheSize = socialReader.currentMediaCacheSize();
-                    if (LOGGING) {
-                        Log.d(LOGTAG, "Media cache " + String.valueOf(mediaCacheSize) + " bytes");
-                    }
                     _addMediaContentSyncTask(item, itemIndex, mediaContent, userInitiated, callback);
                 }
             });
@@ -381,7 +377,7 @@ public class SyncService {
                     for (int itemIndex = 0; itemIndex < task.feed.getItems().size(); itemIndex++) {
                         Item item = task.feed.getItems().get(itemIndex);
                         for (MediaContent contentItem : item.getMediaContent()) {
-                            addMediaContentSyncTask(item, itemIndex, contentItem, userInitiated, null);
+                            addMediaContentSyncTask(item, itemIndex, contentItem, false, null);
                         }
                     }
 
