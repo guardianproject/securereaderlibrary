@@ -237,7 +237,7 @@ public class DatabaseAdapter
 				for (Item item : feed.getItems()) {
 					item.setFeedId(feed.getDatabaseId());
 					item.setSource(feed.getTitle());
-					addOrUpdateItem(item, itemLimit);
+					addOrUpdateItem(item, true, itemLimit);
 				}
 			}
 			db.setTransactionSuccessful();
@@ -420,8 +420,7 @@ public class DatabaseAdapter
 			}
 		}
 	}
-	
-	
+
 	// TODO - don't call this every time an item is inserted. Use some kind of timer?
 	public void deleteOverLimitItems(int limit) {
 		Cursor queryCursor = null;
@@ -601,13 +600,13 @@ public class DatabaseAdapter
 
 	public Feed getSubscribedFeedItems(int numItems)
 	{
-		return getItems(-1, Boolean.TRUE, null, null, null, false, numItems);
+		return getItems(-1, Boolean.TRUE, null, null, null,null, false, numItems);
 	}
 
-	public Feed getItems(long feedId, Boolean subscribed, Boolean favorited, Boolean shared, String searchPhrase, boolean randomized, int limit) {
+	public Feed getItems(long feedId, Boolean subscribed, Boolean favorited, Boolean shared, Boolean viewed, String searchPhrase, boolean randomized, int limit) {
 		Feed feed = new Feed();
 
-		Cursor queryCursor = getItemsCursor(feedId, subscribed, favorited, shared, searchPhrase, randomized, limit);
+		Cursor queryCursor = getItemsCursor(feedId, subscribed, favorited, shared, viewed, searchPhrase, randomized, limit);
 		if (queryCursor != null) {
 			if (queryCursor.moveToFirst()) {
 				do {
@@ -629,7 +628,7 @@ public class DatabaseAdapter
 		return feed;
 	}
 
-	public Cursor getItemsCursor(long feedId, Boolean subscribed, Boolean favorited, Boolean shared, String searchPhrase, boolean randomized, int limit)
+	public Cursor getItemsCursor(long feedId, Boolean subscribed, Boolean favorited, Boolean shared, Boolean viewed, String searchPhrase, boolean randomized, int limit)
 	{
 		try
 		{
@@ -641,7 +640,7 @@ public class DatabaseAdapter
 					+ DatabaseHelper.ITEMS_TABLE_SOURCE + ", " + DatabaseHelper.ITEMS_TABLE_TITLE + ", " + DatabaseHelper.ITEMS_TABLE_FEED_ID + ", "
 					+ DatabaseHelper.ITEMS_TABLE_PUBLISH_DATE + ", " + DatabaseHelper.FEEDS_TABLE_COLUMN_ID + ", " + DatabaseHelper.ITEMS_TABLE_SHARED + ", "
 					+ DatabaseHelper.FEEDS_TABLE_TITLE + ", " + DatabaseHelper.FEEDS_TABLE_SUBSCRIBED + ", " + DatabaseHelper.ITEMS_TABLE_REMOTE_POST_ID + ", "
-					+ DatabaseHelper.ITEMS_TABLE_COMMENTS_URL
+					+ DatabaseHelper.ITEMS_TABLE_COMMENTS_URL + ", " + DatabaseHelper.ITEMS_TABLE_VIEWCOUNT
 					+ " from " + DatabaseHelper.ITEMS_TABLE + ", " + DatabaseHelper.FEEDS_TABLE
 			        + " where " + DatabaseHelper.ITEMS_TABLE_FEED_ID + " = " + DatabaseHelper.FEEDS_TABLE_COLUMN_ID;
 
@@ -668,6 +667,12 @@ public class DatabaseAdapter
 			if (shared != null) {
 				query += " and " + DatabaseHelper.ITEMS_TABLE_SHARED + " = ?";
 				params.add(shared ? "1" : "0");
+			}
+			if (viewed != null) {
+				if (viewed)
+					query += " and " + DatabaseHelper.ITEMS_TABLE_VIEWCOUNT + " > 0";
+				else
+					query += " and " + DatabaseHelper.ITEMS_TABLE_VIEWCOUNT + " = 0";
 			}
 			if (randomized) {
 				query += " order by RANDOM()";
@@ -711,6 +716,7 @@ public class DatabaseAdapter
 			int publishDateColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_PUBLISH_DATE);
 			int remotePostIdColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_REMOTE_POST_ID);
 			int commentsUrlColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_COMMENTS_URL);
+			int viewCountColumn = queryCursor.getColumnIndex(DatabaseHelper.ITEMS_TABLE_VIEWCOUNT);
 
 			int feedTableFeedIdColumn = queryCursor.getColumnIndex(DatabaseHelper.FEEDS_TABLE_COLUMN_ID);
 			int feedTableFeedTitle = queryCursor.getColumnIndex(DatabaseHelper.FEEDS_TABLE_TITLE);
@@ -732,7 +738,7 @@ public class DatabaseAdapter
 				int shared = queryCursor.getInt(sharedColumn);
 				String link = queryCursor.getString(linkColumn);
 				String commentsUrl = queryCursor.getString(commentsUrlColumn);
-
+				int viewCount = queryCursor.getInt(viewCountColumn);
 
 				String feedTitle = (feedTableFeedTitle == -1) ? null : queryCursor.getString(feedTableFeedTitle);
 				int remotePostId = queryCursor.getInt(remotePostIdColumn);
@@ -744,6 +750,7 @@ public class DatabaseAdapter
 				item.setContentEncoded(contentEncoded);
 				item.dbsetRemotePostId(remotePostId);
 				item.setCommentsUrl(commentsUrl);
+				item.setViewCount(viewCount);
 				if (favorite == 1) {
 					item.setFavorite(true);
 				} else {
@@ -917,19 +924,19 @@ public class DatabaseAdapter
 	}
 
 	public Feed getAllFavoriteItems() {
-		return getItems(-1, null, Boolean.TRUE, null, null, false, 0);
+		return getItems(-1, null, Boolean.TRUE, null, null,null, false, 0);
 	}
 
 	public Feed getFavoriteFeedItems(Feed feed) {
-		return getItems(feed.getDatabaseId(), null, Boolean.TRUE, null, null, false, 0);
+		return getItems(feed.getDatabaseId(), null, Boolean.TRUE, null, null, null, false, 0);
 	}
 
 	public Feed getAllSharedItems() {
-		return getItems(-1, null, null, Boolean.TRUE, null, false, 0);
+		return getItems(-1, null, null, Boolean.TRUE, null, null, false, 0);
 	}
 
 	public Feed getSharedFeedItems(Feed feed) {
-		return getItems(feed.getDatabaseId(), null, null, Boolean.TRUE, null, false, 0);
+		return getItems(feed.getDatabaseId(), null, null, Boolean.TRUE, null, null, false, 0);
 	}
 	
 	/*
@@ -1004,7 +1011,8 @@ public class DatabaseAdapter
 						+ DatabaseHelper.ITEMS_TABLE_SHARED + ", " + DatabaseHelper.ITEMS_TABLE_GUID
 						+ ", " + DatabaseHelper.ITEMS_TABLE_LINK + ", " + DatabaseHelper.ITEMS_TABLE_SOURCE + ", " + DatabaseHelper.ITEMS_TABLE_TITLE + ", "
 						+ DatabaseHelper.ITEMS_TABLE_FEED_ID + ", " + DatabaseHelper.ITEMS_TABLE_PUBLISH_DATE + ", "
-						+ DatabaseHelper.ITEMS_TABLE_REMOTE_POST_ID + ", " + DatabaseHelper.ITEMS_TABLE_COMMENTS_URL
+						+ DatabaseHelper.ITEMS_TABLE_REMOTE_POST_ID + ", " + DatabaseHelper.ITEMS_TABLE_COMMENTS_URL + ", "
+						+ DatabaseHelper.ITEMS_TABLE_VIEWCOUNT
 						+ " from " + DatabaseHelper.ITEMS_TABLE
 						+ " where " + DatabaseHelper.ITEMS_TABLE_FEED_ID + " = ? order by "
 						+ DatabaseHelper.ITEMS_TABLE_PUBLISH_DATE + " DESC LIMIT " + numItems + ";";
@@ -1017,7 +1025,8 @@ public class DatabaseAdapter
 						+ DatabaseHelper.ITEMS_TABLE_SHARED + ", " + DatabaseHelper.ITEMS_TABLE_GUID
 						+ ", " + DatabaseHelper.ITEMS_TABLE_LINK + ", " + DatabaseHelper.ITEMS_TABLE_SOURCE + ", " + DatabaseHelper.ITEMS_TABLE_TITLE + ", "
 						+ DatabaseHelper.ITEMS_TABLE_FEED_ID + ", " + DatabaseHelper.ITEMS_TABLE_PUBLISH_DATE 
-						+ ", " + DatabaseHelper.ITEMS_TABLE_REMOTE_POST_ID + ", " + DatabaseHelper.ITEMS_TABLE_COMMENTS_URL
+						+ ", " + DatabaseHelper.ITEMS_TABLE_REMOTE_POST_ID + ", " + DatabaseHelper.ITEMS_TABLE_COMMENTS_URL + ", "
+						+ DatabaseHelper.ITEMS_TABLE_VIEWCOUNT
 						+ " from " + DatabaseHelper.ITEMS_TABLE
 						+ " where " + DatabaseHelper.ITEMS_TABLE_FEED_ID + " = ? order by "
 						+ DatabaseHelper.ITEMS_TABLE_PUBLISH_DATE + " DESC;";
@@ -1062,10 +1071,11 @@ public class DatabaseAdapter
 		return feed;
 	}
 
-	public long addOrUpdateItem(Item item, int limit) {
+	public long addOrUpdateItem(Item item, boolean merge, int limit) {
 		long returnValue = -1;
 		if (databaseReady()) {
 			try {
+				boolean isNewItem = false;
 				if (item.getDatabaseId() == Item.DEFAULT_DATABASE_ID) {
 					// Get existing database ID
 					String query = "select " + DatabaseHelper.ITEMS_TABLE_COLUMN_ID
@@ -1077,6 +1087,7 @@ public class DatabaseAdapter
 						item.setDatabaseId(id);
 					} catch (SQLiteDoneException e) {
 						// Not found, this is an insert of a new row!
+						isNewItem = true;
 					}
 				}
 
@@ -1091,15 +1102,19 @@ public class DatabaseAdapter
 				values.put(DatabaseHelper.ITEMS_TABLE_GUID, item.getGuid());
 				values.put(DatabaseHelper.ITEMS_TABLE_LINK, item.getLink());
 				values.put(DatabaseHelper.ITEMS_TABLE_SOURCE, item.getSource());
-				values.put(DatabaseHelper.ITEMS_TABLE_SHARED, item.getShared());
-				values.put(DatabaseHelper.ITEMS_TABLE_FAVORITE, item.getFavorite());
+				if (!merge || isNewItem) {
+					values.put(DatabaseHelper.ITEMS_TABLE_SHARED, item.getShared());
+					values.put(DatabaseHelper.ITEMS_TABLE_FAVORITE, item.getFavorite());
+				}
 				values.put(DatabaseHelper.ITEMS_TABLE_REMOTE_POST_ID, item.getRemotePostId());
 
 				if (item.getPubDate() != null) {
 					values.put(DatabaseHelper.ITEMS_TABLE_PUBLISH_DATE, dateFormat.format(item.getPubDate()));
 				}
 
-				values.put(DatabaseHelper.ITEMS_TABLE_VIEWCOUNT, item.getViewCount());
+				if (!merge || isNewItem) {
+					values.put(DatabaseHelper.ITEMS_TABLE_VIEWCOUNT, item.getViewCount());
+				}
 
 				if (item.getDatabaseId() != Item.DEFAULT_DATABASE_ID) {
 					// Update existing

@@ -120,7 +120,7 @@ public class SocialReporter
 					item.addTag(tag);
 			}
 	
-			socialReader.databaseAdapter.addOrUpdateItem(item, -1);
+			socialReader.databaseAdapter.addOrUpdateItem(item, false, -1);
 		} else {
 			if (LOGGING)
 				Log.e(LOGTAG,"Database not ready");
@@ -136,7 +136,7 @@ public class SocialReporter
 		if (socialReader.databaseAdapter != null && socialReader.databaseAdapter.databaseReady())
 		{
 			story.setPubDate(new Date());
-			socialReader.databaseAdapter.addOrUpdateItem(story, -1);
+			socialReader.databaseAdapter.addOrUpdateItem(story, false, -1);
 		}
 		else 
 		{

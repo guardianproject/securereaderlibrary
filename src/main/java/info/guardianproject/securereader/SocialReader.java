@@ -603,9 +603,14 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 			if (LOGGING)
 				Log.v(LOGTAG, "Checking Article Expirations");
 			settings.setLastItemExpirationCheckTime(System.currentTimeMillis());
-			Date expirationDate = new Date(System.currentTimeMillis() - settings.getCurrentMode().articleExpirationMillis());
-			if (databaseAdapter != null && databaseAdapter.databaseReady())
-				databaseAdapter.deleteExpiredItems(expirationDate);
+
+			// When set to "AfterRead", items are instead deleted when we get a feed update and the item is not
+			// in the update AND viewCount > 0
+			if (settings.getCurrentMode().articleExpiration() != ModeSettings.ArticleExpiration.AfterRead) {
+				Date expirationDate = new Date(System.currentTimeMillis() - settings.getCurrentMode().articleExpirationMillis());
+				if (databaseAdapter != null && databaseAdapter.databaseReady())
+					databaseAdapter.deleteExpiredItems(expirationDate);
+			}
 		}
 	}
 
@@ -1442,13 +1447,13 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		return returnFeed;
 	}
 
-	public Cursor getItemsCursor(long feedId, Boolean subscribed, Boolean favorited, Boolean shared, String searchPhrase, boolean randomized, int limit)
+	public Cursor getItemsCursor(long feedId, Boolean subscribed, Boolean favorited, Boolean shared, Boolean viewed, String searchPhrase, boolean randomized, int limit)
 	{
 		if (databaseAdapter != null && databaseAdapter.databaseReady())
 		{
 			try
 			{
-				return databaseAdapter.getItemsCursor(feedId, subscribed, favorited, shared, searchPhrase, randomized, limit);
+				return databaseAdapter.getItemsCursor(feedId, subscribed, favorited, shared, viewed, searchPhrase, randomized, limit);
 			}
 			catch(IllegalStateException e)
 			{
@@ -1551,7 +1556,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 			talkItem.setDescription("This is an example favorite.  Anything you mark as a favorite will show up in this section and won't be automatically deleted");
 			talkItem.dbsetRemotePostId(talkItemId);
 			talkItem.setCommentsUrl(applicationContext.getResources().getString(R.string.talk_item_feed_url));
-			this.databaseAdapter.addOrUpdateItem(talkItem, itemLimit);
+			this.databaseAdapter.addOrUpdateItem(talkItem, false, itemLimit);
 			if (LOGGING)
 				Log.v(LOGTAG, "talkItem has database ID " + talkItem.getDatabaseId());
 		}
@@ -1941,8 +1946,6 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		
 		if (databaseAdapter != null && databaseAdapter.databaseReady())
 		{
-			// Pass in the item that will be marked as a favorite
-			// Take a boolean so we can "unmark" a favorite as well.
 			item.incrementViewCount();
 			setItemData(item);
 		}
@@ -1977,7 +1980,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	{
 		if (databaseAdapter != null && databaseAdapter.databaseReady())
 		{
-			return databaseAdapter.addOrUpdateItem(item, itemLimit);
+			return databaseAdapter.addOrUpdateItem(item, false, itemLimit);
 		}
 		else
 		{
@@ -1995,7 +1998,35 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	{
 		if (databaseAdapter != null && databaseAdapter.databaseReady())
 		{
+			ArrayList<Item> oldItems = databaseAdapter.getFeedItems(feed.getDatabaseId(), -1);
+
 			databaseAdapter.addOrUpdateFeedAndItems(feed, itemLimit);
+
+			Date expirationDate = new Date(System.currentTimeMillis() - settings.getCurrentMode().articleExpirationMillis());
+			if (oldItems != null) {
+				for (Item oldItem : oldItems) {
+					if (oldItem.getShared() || oldItem.getFavorite()) {
+						continue;
+					}
+					if (settings.getCurrentMode().articleExpiration() == ModeSettings.ArticleExpiration.AfterRead && oldItem.getViewCount() > 0) {
+						// Only delete if not present in the update
+						boolean found = false;
+						for (Item newItem : feed.getItems()) {
+							if (newItem.getDatabaseId() == oldItem.getDatabaseId()) {
+								found = true;
+								break;
+							}
+						}
+						if (!found) {
+							databaseAdapter.deleteItem(oldItem.getDatabaseId());
+						}
+					} else if (settings.getCurrentMode().articleExpiration() != ModeSettings.ArticleExpiration.AfterRead) {
+						if (oldItem.getPubDate().before(expirationDate)) {
+							databaseAdapter.deleteItem(oldItem.getDatabaseId());
+						}
+					}
+				}
+			}
 		}
 		else
 		{

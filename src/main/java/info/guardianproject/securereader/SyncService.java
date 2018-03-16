@@ -175,6 +175,12 @@ public class SyncService {
 
     public void addCommentsSyncTask(final Item item, final boolean userInitiated, final SyncTaskCommentsFetcher.SyncServiceCommentsFeedFetchedCallback callback) {
         if (socialReader.shouldSync(ModeSettings.Sync.FullText, userInitiated)) { // TODO - add another enum for comments?
+
+            // If expiration is "after read" check the viewCount flag
+            if (socialReader.settings.getCurrentMode().articleExpiration() == ModeSettings.ArticleExpiration.AfterRead && item.getViewCount() > 0) {
+                return;
+            }
+
             taskQueueHandler.post(new Runnable() {
                 @Override
                 public void run() {
@@ -186,6 +192,12 @@ public class SyncService {
 
     public void addMediaContentSyncTask(final Item item, final int itemIndex, final MediaContent mediaContent, final boolean userInitiated, final SyncTaskMediaFetcher.SyncTaskMediaFetcherCallback callback) {
         if (socialReader.shouldSync((mediaContent.getMediaContentType() == MediaContent.MediaContentType.FULLTEXT) ? ModeSettings.Sync.FullText : ModeSettings.Sync.Media, userInitiated)) {
+
+            // If expiration is "after read" check the viewCount flag
+            if (socialReader.settings.getCurrentMode().articleExpiration() == ModeSettings.ArticleExpiration.AfterRead && item.getViewCount() > 0) {
+                return;
+            }
+
             taskQueueHandler.post(new Runnable() {
                 @Override
                 public void run() {
