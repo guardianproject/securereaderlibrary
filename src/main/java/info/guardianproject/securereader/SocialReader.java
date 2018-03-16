@@ -3030,7 +3030,21 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 
 	}
 
-	public String getFullTextForItem(Item item) {
+	public boolean hasFullTextForItem(Item item) {
+		if (item == null || item.getNumberOfMediaContent() == 0) {
+			return false;
+		}
+		for (MediaContent content : item.getMediaContent()) {
+			if (content.getMediaContentType() == MediaContent.MediaContentType.FULLTEXT) {
+				File possibleFile = new File(getFileSystemDir(), MEDIA_CONTENT_FILE_PREFIX + content.getDatabaseId());
+				return possibleFile.exists();
+			}
+		}
+		return false;
+	}
+
+
+	public File getFullTextForItem(Item item) {
 		if (item == null || item.getNumberOfMediaContent() == 0) {
 			return null;
 		}
@@ -3038,38 +3052,11 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 			if (content.getMediaContentType() == MediaContent.MediaContentType.FULLTEXT) {
 				File possibleFile = new File(getFileSystemDir(), MEDIA_CONTENT_FILE_PREFIX + content.getDatabaseId());
 				if (possibleFile.exists()) {
-					try {
-						return getFileContents(possibleFile);
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
+					return possibleFile;
 				}
 				return null;
 			}
 		}
 		return null;
-	}
-
-	private String getFileContents(final File file) throws IOException {
-		final InputStream inputStream = new FileInputStream(file);
-		final BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
-
-		final StringBuilder stringBuilder = new StringBuilder();
-
-		boolean done = false;
-
-		while (!done) {
-			final String line = reader.readLine();
-			done = (line == null);
-
-			if (line != null) {
-				stringBuilder.append(line);
-			}
-		}
-
-		reader.close();
-		inputStream.close();
-
-		return stringBuilder.toString();
 	}
 }
