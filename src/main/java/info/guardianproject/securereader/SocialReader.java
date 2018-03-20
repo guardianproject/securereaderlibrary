@@ -109,6 +109,11 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 		void onFeedParsed(Feed feed);
 	}
 
+	public interface SocialReaderFullTextPreprocessor
+	{
+		String onFullTextDownloaded(Item item, MediaContent content, File file);
+	}
+
 	// Change this when building for release
 	public static final boolean TESTING = false;
 	
@@ -192,6 +197,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	//SyncServiceConnection syncServiceConnection;
 	SocialReaderLockListener lockListener;
 	SocialReaderFeedPreprocessor feedPreprocessor;
+	SocialReaderFullTextPreprocessor fullTextPreprocessor;
 
 	public static final int ONLINE = 1;
 	public static final int NOT_ONLINE_NO_PROXY = -1;
@@ -436,6 +442,16 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	public void setFeedPreprocessor(SocialReaderFeedPreprocessor feedPreprocessor)
 	{
 		this.feedPreprocessor = feedPreprocessor;
+	}
+
+	public SocialReaderFullTextPreprocessor getFullTextPreprocessor()
+	{
+		return this.fullTextPreprocessor;
+	}
+
+	public void setFullTextPreprocessor(SocialReaderFullTextPreprocessor fullTextPreprocessor)
+	{
+		this.fullTextPreprocessor = fullTextPreprocessor;
 	}
 
 	private boolean initialized = false;
@@ -2453,10 +2469,14 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	}
 	
 	public boolean loadMediaContent(Item item, MediaContent mc, final SyncTaskMediaFetcher.SyncTaskMediaFetcherCallback mdc, boolean download, boolean forceBitwiseDownload) {
+		if (mc.getMediaContentType() == MediaContent.MediaContentType.FULLTEXT) {
+			forceBitwiseDownload = forceBitwiseDownload || (syncSettingsForCurrentNetwork().contains(ModeSettings.Sync.FullText));
+		}
+
 		switch (mc.getMediaContentType()) {
 			case IMAGE:
 				forceBitwiseDownload = forceBitwiseDownload || (syncSettingsForCurrentNetwork().contains(ModeSettings.Sync.Media));
-				// Allow to fall through
+			case FULLTEXT:
 			case EPUB:
 			case VIDEO:
 			case AUDIO:

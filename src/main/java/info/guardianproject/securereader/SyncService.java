@@ -584,7 +584,7 @@ public class SyncService {
         }
     }
 
-    private PrioritizedListenableFutureTask<SyncTaskMediaFetcher> _addMediaContentSyncTask(Item item, int itemIndex, MediaContent mediaContent, boolean userInitiated, final SyncTaskMediaFetcher.SyncTaskMediaFetcherCallback callback) {
+    private PrioritizedListenableFutureTask<SyncTaskMediaFetcher> _addMediaContentSyncTask(Item item, int itemIndex, MediaContent mediaContent, boolean userInitiated, SyncTaskMediaFetcher.SyncTaskMediaFetcherCallback callback) {
 
         if (new File(socialReader.getFileSystemDir(), SocialReader.MEDIA_CONTENT_FILE_PREFIX + mediaContent.getDatabaseId()).exists()) {
             // Exists, don't add
@@ -602,6 +602,9 @@ public class SyncService {
                     task.setPriority(priority);
                     syncServiceExecutorQueue.offer(task);
                 }
+                if (callback != null) {
+                    ((SyncTaskMediaFetcher)task.getTask()).addCallback(callback);
+                }
                 return task; // Already in queue
             }
 
@@ -610,7 +613,11 @@ public class SyncService {
                 return null; // Wait a bit longer...
             }
 
-            task = (PrioritizedListenableFutureTask<SyncTaskMediaFetcher>) syncServiceExecutorService.submit(new SyncTaskMediaFetcher(context, identifier, priority, mediaContent));
+            SyncTaskMediaFetcher mediaFetcher = new SyncTaskMediaFetcher(context, identifier, priority, item, mediaContent);
+            if (callback != null) {
+                mediaFetcher.addCallback(callback);
+            }
+            task = (PrioritizedListenableFutureTask<SyncTaskMediaFetcher>) syncServiceExecutorService.submit(mediaFetcher);
             task.addListener(new PrioritizedTaskListener<SyncTaskMediaFetcher>(task) {
 
                 private void sendBroadcast(MediaContent mediaContent, SyncStatus status) {
@@ -624,7 +631,7 @@ public class SyncService {
                 protected void onSuccess(final SyncTaskMediaFetcher task) {
                     super.onSuccess(task);
                     sendBroadcast(task.mediaContent, SyncStatus.OK);
-                    if (callback != null) {
+                    for (final SyncTaskMediaFetcher.SyncTaskMediaFetcherCallback callback : task.getCallbacks()) {
                         handler.post(new Runnable() {
                             @Override
                             public void run() {
@@ -635,14 +642,14 @@ public class SyncService {
                 }
 
                 @Override
-                protected void onFailure(SyncTaskMediaFetcher task) {
+                protected void onFailure(final SyncTaskMediaFetcher task) {
                     super.onFailure(task);
                     sendBroadcast(task.mediaContent, SyncStatus.ERROR_UNKNOWN);
-                    if (callback != null) {
+                    for (final SyncTaskMediaFetcher.SyncTaskMediaFetcherCallback callback : task.getCallbacks()) {
                         handler.post(new Runnable() {
                             @Override
                             public void run() {
-                                callback.mediaDownloadError(null);
+                                callback.mediaDownloadError(task.mediaContent);
                             }
                         });
                     }

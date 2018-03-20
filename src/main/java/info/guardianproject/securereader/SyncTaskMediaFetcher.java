@@ -4,13 +4,20 @@ import android.content.Context;
 import android.graphics.BitmapFactory;
 import android.text.TextUtils;
 
+import com.tinymission.rss.Item;
 import com.tinymission.rss.MediaContent;
 
 import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.BufferedWriter;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 
 import cz.msebera.android.httpclient.HttpStatus;
 import info.guardianproject.iocipher.File;
 import info.guardianproject.iocipher.FileInputStream;
+import info.guardianproject.iocipher.FileOutputStream;
 
 public class SyncTaskMediaFetcher extends SyncTask<SyncTaskMediaFetcher> {
 	private final static boolean LOGGING = false;
@@ -22,13 +29,27 @@ public class SyncTaskMediaFetcher extends SyncTask<SyncTaskMediaFetcher> {
 		void mediaDownloadError(MediaContent mediaContent);
 	}
 
+	public final Item item;
 	public final MediaContent mediaContent;
     public File targetFile;
+	private final List<SyncTaskMediaFetcherCallback> callbacks;
 
-    public SyncTaskMediaFetcher(Context context, String identifier, long priority, MediaContent mediaContent)
+    public SyncTaskMediaFetcher(Context context, String identifier, long priority, Item item, MediaContent mediaContent)
 	{
 		super(context, identifier, priority);
+		this.item = item;
 		this.mediaContent = mediaContent;
+		this.callbacks = new ArrayList<>();
+	}
+
+	public void addCallback(SyncTaskMediaFetcherCallback callback) {
+		if (!callbacks.contains(callback)) {
+			callbacks.add(callback);
+		}
+	}
+
+	public List<SyncTaskMediaFetcherCallback> getCallbacks() {
+    	return callbacks;
 	}
 
 	@Override
@@ -42,7 +63,11 @@ public class SyncTaskMediaFetcher extends SyncTask<SyncTaskMediaFetcher> {
 					mediaContent.setFileSize(targetFile.length());
 					mediaContent.setDownloaded(true);
 					mediaContent.setSyncStatus(SyncStatus.OK);
-					getBitmapDimensions(targetFile);
+					if (mediaContent.getMediaContentType() == MediaContent.MediaContentType.FULLTEXT) {
+						processFullText(targetFile);
+					} else {
+						getBitmapDimensions(targetFile);
+					}
 					SocialReader.getInstance(getContext()).databaseAdapter.addOrUpdateItemMedia(mediaContent);
 				} else {
 					mediaContent.setSyncStatus(SyncStatus.ERROR_UNKNOWN);
@@ -83,6 +108,21 @@ public class SyncTaskMediaFetcher extends SyncTask<SyncTaskMediaFetcher> {
 		catch (Exception ignored)
 		{
 		}
+	}
+
+	private void processFullText(File targetFile) {
+		try {
+			SocialReader socialReader = SocialReader.getInstance(getContext());
+			if (socialReader.getFullTextPreprocessor() != null) {
+				String result = socialReader.getFullTextPreprocessor().onFullTextDownloaded(item, mediaContent, targetFile);
+				if (result != null) {
+					// Data seems to have been processed, save back to file
+					BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(targetFile));
+					bos.write(result.getBytes());
+					bos.close();
+				}
+			}
+		} catch (Exception ignored) {}
 	}
 
 	@Override
