@@ -613,7 +613,7 @@ public class SyncService {
                 return null; // Wait a bit longer...
             }
 
-            SyncTaskMediaFetcher mediaFetcher = new SyncTaskMediaFetcher(context, identifier, priority, item, mediaContent);
+            final SyncTaskMediaFetcher mediaFetcher = new SyncTaskMediaFetcher(context, handler, identifier, priority, item, mediaContent);
             if (callback != null) {
                 mediaFetcher.addCallback(callback);
             }
@@ -655,6 +655,15 @@ public class SyncService {
                     }
                 }
             }, MoreExecutors.directExecutor());
+
+            for (final SyncTaskMediaFetcher.SyncTaskMediaFetcherCallback cb : mediaFetcher.getCallbacks()) {
+                handler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        cb.mediaAddedToQueue(mediaFetcher.mediaContent);
+                    }
+                });
+            }
             return task;
         }
     }
@@ -858,6 +867,12 @@ public class SyncService {
             }
         }
         return false;
+    }
+
+    public boolean isMediaSyncing(MediaContent mediaContent) {
+        String identifier = DownloadType.ItemMedia.name() + ":" + mediaContent.getUrl();
+        PrioritizedListenableFutureTask<SyncTaskFeedFetcher> task = getExistingTask(identifier);
+        return (task != null);
     }
 
     public void cancelAllForFeed(Feed feed) {

@@ -2458,7 +2458,14 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 	{
 		return loadMediaContent(item, mc, null, false, false);
 	}
-	
+
+	public boolean isMediaContentLoading(Item item, MediaContent mc) {
+		if (syncService != null) {
+			syncService.isMediaSyncing(mc);
+		}
+		return false;
+	}
+
 	public boolean loadMediaContent(Item item, MediaContent mc, SyncTaskMediaFetcher.SyncTaskMediaFetcherCallback mdc) {
 		return loadMediaContent(item, mc, mdc, false);
 	}

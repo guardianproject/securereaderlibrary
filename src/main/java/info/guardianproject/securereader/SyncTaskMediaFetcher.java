@@ -2,6 +2,7 @@ package info.guardianproject.securereader;
 
 import android.content.Context;
 import android.graphics.BitmapFactory;
+import android.os.Handler;
 import android.text.TextUtils;
 
 import com.tinymission.rss.Item;
@@ -25,6 +26,8 @@ public class SyncTaskMediaFetcher extends SyncTask<SyncTaskMediaFetcher> {
 
 	public interface SyncTaskMediaFetcherCallback
 	{
+		void mediaAddedToQueue(MediaContent mediaContent);
+		void mediaDownloadStarted(MediaContent mediaContent);
 		void mediaDownloaded(MediaContent mediaContent, File file);
 		void mediaDownloadError(MediaContent mediaContent);
 	}
@@ -32,13 +35,15 @@ public class SyncTaskMediaFetcher extends SyncTask<SyncTaskMediaFetcher> {
 	public final Item item;
 	public final MediaContent mediaContent;
     public File targetFile;
+	private final Handler handler; // The handler to use when calling the callbacks from in here
 	private final List<SyncTaskMediaFetcherCallback> callbacks;
 
-    public SyncTaskMediaFetcher(Context context, String identifier, long priority, Item item, MediaContent mediaContent)
+    public SyncTaskMediaFetcher(Context context, Handler handler, String identifier, long priority, Item item, MediaContent mediaContent)
 	{
 		super(context, identifier, priority);
 		this.item = item;
 		this.mediaContent = mediaContent;
+		this.handler = handler;
 		this.callbacks = new ArrayList<>();
 	}
 
@@ -58,6 +63,17 @@ public class SyncTaskMediaFetcher extends SyncTask<SyncTaskMediaFetcher> {
 		if (mediaContent != null && !TextUtils.isEmpty(mediaContent.getUrl())) {
             targetFile = new File(socialReader.getFileSystemDir(), SocialReader.MEDIA_CONTENT_FILE_PREFIX + mediaContent.getDatabaseId());
 			if (!targetFile.exists()) {
+
+				// Tell listeners we are downloading
+				for (final SyncTaskMediaFetcherCallback callback : getCallbacks()) {
+					handler.post(new Runnable() {
+						@Override
+						public void run() {
+							callback.mediaDownloadStarted(mediaContent);
+						}
+					});
+				}
+
 				int statusCode = downloadToFile(mediaContent.getUrl(), targetFile);
 				if (statusCode == HttpStatus.SC_OK) {
 					mediaContent.setFileSize(targetFile.length());
