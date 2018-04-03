@@ -58,7 +58,7 @@
 	<string-array name="pref_default_optimized_sync_over_data">
 		<item>@string/pref_key_sync_summaries</item>
 	</string-array>
-	<bool name="pref_default_optimized_media_rich">false</bool>
+	<bool name="pref_default_optimized_media_rich">true</bool>
 	<string name="pref_default_optimized_article_expiration">@string/pref_key_article_expiration_afterread</string>
 	<bool name="pref_default_optimized_save_power_enabled">true</bool>
 	<integer name="pref_default_optimized_save_power_percentage">20</integer>

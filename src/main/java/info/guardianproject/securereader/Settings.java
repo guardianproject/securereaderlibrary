@@ -1,25 +1,19 @@
 package info.guardianproject.securereader;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
 import android.annotation.SuppressLint;
-import android.app.Application;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.content.res.TypedArray;
 import android.preference.PreferenceManager;
 import android.text.TextUtils;
 import android.util.Log;
 
 import com.google.common.collect.Lists;
-
-import static info.guardianproject.securereader.Settings.Mode.Everything;
 
 public class Settings implements SharedPreferences.OnSharedPreferenceChangeListener {
 	public static final String LOGTAG = "Settings";
@@ -32,7 +26,9 @@ public class Settings implements SharedPreferences.OnSharedPreferenceChangeListe
 	protected final SharedPreferences mPrefs;
 	protected ModeSettings currentMode;
 	protected ModeSettings modeOptimized;
+	private long modeOptimizedDefaultSize; // Size on disk when default settings are set
 	protected ModeSettings modeEverything;
+	private long modeEverythingDefaultSize; // Size on disk when default settings are set
 	protected ModeSettings modeOffline;
 
 	// Use these constants when listening to changes, to see what property has
@@ -98,6 +94,48 @@ public class Settings implements SharedPreferences.OnSharedPreferenceChangeListe
 		initializeIfNeeded();
 	}
 
+	public void resetModeSettings(Mode mode) {
+		if (mode == Mode.Optimized) {
+			modeOptimized.mPrefs.edit()
+					.clear()
+					.putString(ModeSettings.KEY_SYNC_FREQUENCY, context.getString(R.string.pref_default_optimized_sync_frequency))
+					.putStringSet(ModeSettings.KEY_SYNC_OVER_WIFI, new HashSet<>(Arrays.asList(context.getResources().getStringArray(R.array.pref_default_optimized_sync_over_wifi))))
+					.putStringSet(ModeSettings.KEY_SYNC_OVER_DATA, new HashSet<>(Arrays.asList(context.getResources().getStringArray(R.array.pref_default_optimized_sync_over_data))))
+					.putBoolean(ModeSettings.KEY_SYNC_MEDIA_RICH, context.getResources().getBoolean(R.bool.pref_default_optimized_media_rich))
+					.putString(ModeSettings.KEY_ARTICLE_EXPIRATION, context.getString(R.string.pref_default_optimized_article_expiration))
+					.putBoolean(ModeSettings.KEY_POWERSAVE_ENABLED, context.getResources().getBoolean(R.bool.pref_default_optimized_save_power_enabled))
+					.putInt(ModeSettings.KEY_POWERSAVE_PERCENTAGE, context.getResources().getInteger(R.integer.pref_default_optimized_save_power_percentage))
+					.apply();
+			onResetOptimizedMode(modeOptimized);
+			modeOptimizedDefaultSize = modeOptimized.mPrefs.getAll().hashCode();
+		} else if (mode == Mode.Everything) {
+			modeEverything.mPrefs.edit()
+					.clear()
+					.putString(ModeSettings.KEY_SYNC_FREQUENCY, context.getString(R.string.pref_default_everything_sync_frequency))
+					.putStringSet(ModeSettings.KEY_SYNC_OVER_WIFI, new HashSet<>(Arrays.asList(context.getResources().getStringArray(R.array.pref_default_everything_sync_over_wifi))))
+					.putStringSet(ModeSettings.KEY_SYNC_OVER_DATA, new HashSet<>(Arrays.asList(context.getResources().getStringArray(R.array.pref_default_everything_sync_over_data))))
+					.putBoolean(ModeSettings.KEY_SYNC_MEDIA_RICH, context.getResources().getBoolean(R.bool.pref_default_everything_media_rich))
+					.putString(ModeSettings.KEY_ARTICLE_EXPIRATION, context.getString(R.string.pref_default_everything_article_expiration))
+					.putBoolean(ModeSettings.KEY_POWERSAVE_ENABLED, context.getResources().getBoolean(R.bool.pref_default_everything_save_power_enabled))
+					.putInt(ModeSettings.KEY_POWERSAVE_PERCENTAGE, context.getResources().getInteger(R.integer.pref_default_everything_save_power_percentage))
+					.apply();
+			modeEverythingDefaultSize = modeEverything.mPrefs.getAll().hashCode();
+		}
+	}
+
+	protected void onResetOptimizedMode(ModeSettings modeOptimized) {
+		// Override if needed
+	}
+
+	public boolean hasChangedModeSettings(Mode mode) {
+		if (mode == Mode.Optimized) {
+			return modeOptimizedDefaultSize != modeOptimized.mPrefs.getAll().hashCode();
+		} else if (mode == Mode.Everything) {
+			return modeEverythingDefaultSize != modeEverything.mPrefs.getAll().hashCode();
+		}
+		return false;
+	}
+
 	private void initializeIfNeeded() {
 		if (!mPrefs.contains(KEY_SETTINGS_VERSION)) {
 			initialize();
@@ -113,24 +151,8 @@ public class Settings implements SharedPreferences.OnSharedPreferenceChangeListe
 
 				.apply();
 
-		modeOptimized.mPrefs.edit()
-				.putString(ModeSettings.KEY_SYNC_FREQUENCY, context.getString(R.string.pref_default_optimized_sync_frequency))
-				.putStringSet(ModeSettings.KEY_SYNC_OVER_WIFI, new HashSet<>(Arrays.asList(context.getResources().getStringArray(R.array.pref_default_optimized_sync_over_wifi))))
-				.putStringSet(ModeSettings.KEY_SYNC_OVER_DATA, new HashSet<>(Arrays.asList(context.getResources().getStringArray(R.array.pref_default_optimized_sync_over_data))))
-				.putBoolean(ModeSettings.KEY_SYNC_MEDIA_RICH, context.getResources().getBoolean(R.bool.pref_default_optimized_media_rich))
-				.putString(ModeSettings.KEY_ARTICLE_EXPIRATION, context.getString(R.string.pref_default_optimized_article_expiration))
-				.putBoolean(ModeSettings.KEY_POWERSAVE_ENABLED, context.getResources().getBoolean(R.bool.pref_default_optimized_save_power_enabled))
-				.putInt(ModeSettings.KEY_POWERSAVE_PERCENTAGE, context.getResources().getInteger(R.integer.pref_default_optimized_save_power_percentage))
-				.apply();
-		modeEverything.mPrefs.edit()
-				.putString(ModeSettings.KEY_SYNC_FREQUENCY, context.getString(R.string.pref_default_everything_sync_frequency))
-				.putStringSet(ModeSettings.KEY_SYNC_OVER_WIFI, new HashSet<>(Arrays.asList(context.getResources().getStringArray(R.array.pref_default_everything_sync_over_wifi))))
-				.putStringSet(ModeSettings.KEY_SYNC_OVER_DATA, new HashSet<>(Arrays.asList(context.getResources().getStringArray(R.array.pref_default_everything_sync_over_data))))
-				.putBoolean(ModeSettings.KEY_SYNC_MEDIA_RICH, context.getResources().getBoolean(R.bool.pref_default_everything_media_rich))
-				.putString(ModeSettings.KEY_ARTICLE_EXPIRATION, context.getString(R.string.pref_default_everything_article_expiration))
-				.putBoolean(ModeSettings.KEY_POWERSAVE_ENABLED, context.getResources().getBoolean(R.bool.pref_default_everything_save_power_enabled))
-				.putInt(ModeSettings.KEY_POWERSAVE_PERCENTAGE, context.getResources().getInteger(R.integer.pref_default_everything_save_power_percentage))
-				.apply();
+		resetModeSettings(Mode.Optimized);
+		resetModeSettings(Mode.Everything);
 		mPrefs.edit()
 				.putInt(KEY_SETTINGS_VERSION, CURRENT_SETTINGS_VERSION).apply();
 	}
