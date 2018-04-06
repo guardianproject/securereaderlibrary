@@ -154,6 +154,10 @@ public class Settings implements SharedPreferences.OnSharedPreferenceChangeListe
 				.putString(KEY_MODE, context.getString(R.string.pref_default_mode))
 				.putString(KEY_PROXY_TYPE, context.getString(R.string.pref_default_security_proxy))
 				.putString(KEY_PANIC_ACTION, context.getString(R.string.pref_default_panic_action))
+				.putInt(KEY_AUTOLOCK, 0)
+				.putString(KEY_WRONG_PASSWORD_ACTION, context.getString(R.string.pref_default_wrong_password_action))
+				.putInt(KEY_WRONG_PASSWORD_LIMIT, context.getResources().getInteger(R.integer.pref_default_wrong_password_limit))
+				.putBoolean(KEY_USE_KILL_PASSPHRASE, false)
 
 				.apply();
 
@@ -376,7 +380,7 @@ public class Settings implements SharedPreferences.OnSharedPreferenceChangeListe
 	 */
 	public int numberOfPasswordAttempts()
 	{
-		return mPrefs.getInt(KEY_WRONG_PASSWORD_LIMIT, 3);
+		return mPrefs.getInt(KEY_WRONG_PASSWORD_LIMIT, context.getResources().getInteger(R.integer.pref_default_wrong_password_limit));
 	}
 
 	/**
@@ -385,7 +389,7 @@ public class Settings implements SharedPreferences.OnSharedPreferenceChangeListe
 	 */
 	public void setNumberOfPasswordAttempts(int attempts)
 	{
-		mPrefs.edit().putInt(KEY_WRONG_PASSWORD_LIMIT, attempts).commit();
+		mPrefs.edit().putInt(KEY_WRONG_PASSWORD_LIMIT, attempts).apply();
 	}
 
 	/**

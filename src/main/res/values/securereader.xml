@@ -50,6 +50,7 @@
 	<string name="pref_default_mode">@string/pref_key_mode_optimized</string>
 	<string name="pref_default_security_proxy">@string/pref_key_security_proxy_tor</string>
 	<string name="pref_default_wrong_password_action">@string/pref_key_wrong_password_action_nothing</string>
+	<integer name="pref_default_wrong_password_limit">2</integer>
 	<string name="pref_default_panic_action">@string/pref_key_panic_action_wipedata</string>
 
 	<string name="pref_default_optimized_sync_frequency">@string/pref_key_sync_frequency_inbackground</string>
