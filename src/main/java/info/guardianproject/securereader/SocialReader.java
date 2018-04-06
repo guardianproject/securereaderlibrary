@@ -856,7 +856,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
 			Log.v(LOGTAG, "SocialReader onPause");
 		appStatus = SocialReader.APP_IN_BACKGROUND;
 		
-		if (settings.passphraseTimeout() == 1) {
+		if (settings.autoLock() == 1) {
 			cacheWord.lock();
 		}
 		
@@ -2800,7 +2800,7 @@ public class SocialReader implements ICacheWordSubscriber, SharedPreferences.OnS
     	if (LOGGING)
     		Log.v(LOGTAG,"onCacheWordOpened");
     	
-		socialReader.setCacheWordTimeout(settings.passphraseTimeout());
+		socialReader.setCacheWordTimeout(settings.autoLock());
 
         initialize();
     }

@@ -5,6 +5,16 @@
     <string name="pref_key_mode_everything">Everything</string>
     <string name="pref_key_mode_offline">Offline</string>
 
+    <string name="pref_key_security_autolock">passphrase_timeout</string>
+
+    <string name="pref_key_wrong_password_action">wrong_password_action</string>
+    <string name="pref_key_wrong_password_action_nothing">Nothing</string>
+    <string name="pref_key_wrong_password_action_wipedata">WipeData</string>
+    <string name="pref_key_wrong_password_action_uninstall">Uninstall</string>
+    <string name="pref_key_wrong_password_limit">num_password_attempts</string>
+    <string name="pref_key_use_kill_passphrase">use_passphrase</string>
+    <string name="pref_key_kill_passphrase">passphrase</string>
+
     <string name="pref_key_security_proxy">proxy_type</string>
     <string name="pref_key_security_proxy_none">None</string>
     <string name="pref_key_security_proxy_tor">Tor</string>

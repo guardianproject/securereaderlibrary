@@ -48,17 +48,18 @@ public class Settings implements SharedPreferences.OnSharedPreferenceChangeListe
 	public static final String KEY_DOWNLOAD_EPUB_READER_DIALOG_SHOWN = "download_epub_reader_dialog_shown";
 
 	public static final String KEY_REQUIRE_TOR = "require_tor";
-	public static final String KEY_PASSPHRASE_TIMEOUT = "passphrase_timeout";
 	public static final String KEY_ARTICLE_EXPIRATION = "article_expiration";
 	public static final String KEY_SYNC_NETWORK = "sync_network";
-	public static final String KEY_PASSWORD_ATTEMPTS = "num_password_attempts";
-	public static final String KEY_USE_KILL_PASSPHRASE = "use_passphrase";
-	public static final String KEY_KILL_PASSPHRASE = "passphrase";
 
 	public static String KEY_MODE;
 	public static String KEY_PROXY_TYPE;
 	public static String KEY_PANIC_ACTION;
 	public static String KEY_UI_LANGUAGE;
+	public static String KEY_AUTOLOCK;
+	public static String KEY_WRONG_PASSWORD_ACTION;
+	public static String KEY_WRONG_PASSWORD_LIMIT;
+	public static String KEY_USE_KILL_PASSPHRASE;
+	public static String KEY_KILL_PASSPHRASE;
 
 	public Settings(Context context)
 	{
@@ -68,6 +69,11 @@ public class Settings implements SharedPreferences.OnSharedPreferenceChangeListe
 		KEY_PROXY_TYPE = context.getString(R.string.pref_key_security_proxy);
 		KEY_PANIC_ACTION = context.getString(R.string.pref_key_panic_action);
 		KEY_UI_LANGUAGE = context.getString(R.string.pref_key_language);
+		KEY_AUTOLOCK = context.getString(R.string.pref_key_security_autolock);
+		KEY_WRONG_PASSWORD_ACTION = context.getString(R.string.pref_key_wrong_password_action);
+		KEY_WRONG_PASSWORD_LIMIT = context.getString(R.string.pref_key_wrong_password_limit);
+		KEY_USE_KILL_PASSPHRASE = context.getString(R.string.pref_key_use_kill_passphrase);
+		KEY_KILL_PASSPHRASE = context.getString(R.string.pref_key_kill_passphrase);
 
 		mPrefs = PreferenceManager.getDefaultSharedPreferences(context);
 		mPrefs.registerOnSharedPreferenceChangeListener(this);
@@ -265,22 +271,22 @@ public class Settings implements SharedPreferences.OnSharedPreferenceChangeListe
 	 * @return Gets the timeout before lock screen is shown
 	 * 
 	 */
-	public int passphraseTimeout()
+	public int autoLock()
 	{
 		// 1 day by default 60 * 60 * 24 = 86400
-		return mPrefs.getInt(KEY_PASSPHRASE_TIMEOUT, 86400);
+		return mPrefs.getInt(KEY_AUTOLOCK, 86400);
 	}
 
 	/**
 	 * @return Sets timeout before lock screen is shown
 	 * 
 	 */
-	public void setPassphraseTimeout(int seconds)
+	public void setAutolock(int seconds)
 	{
 		if (LOGGING)
-			Log.v(LOGTAG,"setPassphraseTimeout: " + seconds);
+			Log.v(LOGTAG,"setAutolock: " + seconds);
 		
-		mPrefs.edit().putInt(KEY_PASSPHRASE_TIMEOUT, seconds).commit();
+		mPrefs.edit().putInt(KEY_AUTOLOCK, seconds).apply();
 	}
 
 	/**
@@ -301,9 +307,20 @@ public class Settings implements SharedPreferences.OnSharedPreferenceChangeListe
 		mPrefs.edit().putString("launch_passphrase", passphrase).commit();
 	}
 
+	public PanicAction wrongPasswordAction()
+	{
+		return Enum.valueOf(PanicAction.class, mPrefs.getString(KEY_WRONG_PASSWORD_ACTION,
+				context.getResources().getString(R.string.pref_default_wrong_password_action)));
+	}
+
+	public void setWrongPasswordAction(PanicAction wrongPasswordAction)
+	{
+		mPrefs.edit().putString(KEY_WRONG_PASSWORD_ACTION, wrongPasswordAction.name()).apply();
+	}
+
 	public enum PanicAction
 	{
-		WipeData, Uninstall
+		WipeData, Uninstall, Nothing
 	}
 
 	public PanicAction panicAction()
@@ -354,12 +371,12 @@ public class Settings implements SharedPreferences.OnSharedPreferenceChangeListe
 	}
 
 	/**
-	 * @return Get number of failed password attempts before content is wiped!
+	 * @return Get number of failed password attempts before content is wiped, 0 to disable the feature!
 	 * 
 	 */
 	public int numberOfPasswordAttempts()
 	{
-		return mPrefs.getInt(KEY_PASSWORD_ATTEMPTS, 3);
+		return mPrefs.getInt(KEY_WRONG_PASSWORD_LIMIT, 3);
 	}
 
 	/**
@@ -368,7 +385,7 @@ public class Settings implements SharedPreferences.OnSharedPreferenceChangeListe
 	 */
 	public void setNumberOfPasswordAttempts(int attempts)
 	{
-		mPrefs.edit().putInt(KEY_PASSWORD_ATTEMPTS, attempts).commit();
+		mPrefs.edit().putInt(KEY_WRONG_PASSWORD_LIMIT, attempts).commit();
 	}
 
 	/**
@@ -422,7 +439,7 @@ public class Settings implements SharedPreferences.OnSharedPreferenceChangeListe
 	 */
 	public void setUseKillPassphrase(boolean use)
 	{
-		mPrefs.edit().putBoolean(KEY_USE_KILL_PASSPHRASE, use).commit();
+		mPrefs.edit().putBoolean(KEY_USE_KILL_PASSPHRASE, use).apply();
 	}
 
 	/**
@@ -440,7 +457,7 @@ public class Settings implements SharedPreferences.OnSharedPreferenceChangeListe
 	 */
 	public void setKillPassphrase(String passphrase)
 	{
-		mPrefs.edit().putString(KEY_KILL_PASSPHRASE, passphrase).commit();
+		mPrefs.edit().putString(KEY_KILL_PASSPHRASE, passphrase).apply();
 	}
 	
 	public long lastOPMLCheckTime() {
